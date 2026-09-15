@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { UserRole } from '../../types';
 import {
@@ -13,7 +13,10 @@ import {
   Wifi,
   WifiOff,
   Radio,
+  LogIn,
 } from 'lucide-react';
+import { auth, onAuthUserChange } from '../../services/firebase';
+import type { User as FirebaseUser } from 'firebase/auth';
 
 interface HeaderProps {
   onOpenCheckIn: () => void;
@@ -21,6 +24,7 @@ interface HeaderProps {
   onToggleMobileDrawer: () => void;
   isSidebarCollapsed: boolean;
   onToggleSidebarCollapse: () => void;
+  onOpenAuthModal: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -29,7 +33,15 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleMobileDrawer,
   isSidebarCollapsed,
   onToggleSidebarCollapse,
+  onOpenAuthModal,
 }) => {
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(auth.currentUser);
+
+  useEffect(() => {
+    const unsub = onAuthUserChange((u) => setFirebaseUser(u));
+    return () => unsub();
+  }, []);
+
   const {
     data,
     activeRole,
@@ -155,6 +167,31 @@ export const Header: React.FC<HeaderProps> = ({
           <span className="hidden md:inline font-mono text-[11px]">
             {syncConfig.enabled ? syncConfig.roomId : 'Local Only'}
           </span>
+        </button>
+
+        {/* Firebase Authentication Button */}
+        <button
+          onClick={onOpenAuthModal}
+          className="flex h-9 items-center space-x-1.5 rounded-md border border-[#E4E4E1] bg-[#FAFAF9] hover:bg-white px-2.5 text-xs font-semibold text-[#14595A] transition-colors cursor-pointer"
+          title="Firebase Authentication (Email, Google, Phone)"
+        >
+          {firebaseUser ? (
+            <div className="flex items-center space-x-1.5">
+              {firebaseUser.photoURL ? (
+                <img src={firebaseUser.photoURL} alt="Avatar" className="h-4 w-4 rounded-full" />
+              ) : (
+                <UserCheck className="h-4 w-4 text-emerald-600" />
+              )}
+              <span className="hidden xl:inline max-w-[100px] truncate text-[11px] font-bold text-emerald-700">
+                {firebaseUser.displayName || firebaseUser.email || firebaseUser.phoneNumber}
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-1">
+              <LogIn className="h-4 w-4 text-[#14595A]" />
+              <span className="hidden sm:inline font-semibold">Firebase Auth</span>
+            </div>
+          )}
         </button>
 
         {/* Role Simulator Dropdown */}

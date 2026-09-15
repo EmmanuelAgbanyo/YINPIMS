@@ -22,6 +22,7 @@ import { PublicRegistrationModal } from './components/registration/PublicRegistr
 import { CommunicationModal } from './components/communications/CommunicationModal';
 import { ExportModal } from './components/reports/ExportModal';
 import { CloudSyncModal } from './components/common/CloudSyncModal';
+import { AuthModal } from './components/auth/AuthModal';
 import type { Event } from './types';
 
 const MainLayout: React.FC = () => {
@@ -32,6 +33,7 @@ const MainLayout: React.FC = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   // Modals state
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
@@ -72,6 +74,7 @@ const MainLayout: React.FC = () => {
         onToggleMobileDrawer={() => setIsMobileDrawerOpen(prev => !prev)}
         isSidebarCollapsed={isSidebarCollapsed}
         onToggleSidebarCollapse={() => setIsSidebarCollapsed(prev => !prev)}
+        onOpenAuthModal={() => setIsAuthModalOpen(true)}
       />
 
       {/* Body Area */}
@@ -198,6 +201,12 @@ const MainLayout: React.FC = () => {
           onClose={() => setIsExportModalOpen(false)}
         />
       )}
+
+      {/* Firebase Authentication Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+      />
 
       {/* Cross-Device Multi-Device Cloud Sync Modal */}
       <CloudSyncModal />
