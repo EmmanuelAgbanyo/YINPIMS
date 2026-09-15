@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+@theme {
+  --font-heading: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  --color-app-bg: #FAFAF9;
+  --color-card-bg: #FFFFFF;
+  --color-card-border: #E4E4E1;
+  --color-primary-text: #1C1C1A;
+  --color-secondary-text: #6B6B66;
+
+  --color-teal-accent: #14595A;
+  --color-teal-hover: #0E4243;
+  --color-teal-light: #EBF4F4;
+
+  --color-status-success: #2F7D4F;
+  --color-status-warning: #C17F16;
+  --color-status-danger: #B0413E;
+
+  --color-status-success-bg: #F0F9F3;
+  --color-status-warning-bg: #FDF9F0;
+  --color-status-danger-bg: #FDF2F2;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-body);
+    background-color: var(--color-app-bg);
+    color: var(--color-primary-text);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+  }
+
+  /* Ensure tabular numbers for numbers and data tables */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Force exact background and foreground colors when printing across all browsers */
+@media print {
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+}
+
+/* Custom scrollbar for clean operational feel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #FAFAF9;
+}
+::-webkit-scrollbar-thumb {
+  background: #D5D5D1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #A3A39E;
+}
