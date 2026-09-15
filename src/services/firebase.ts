@@ -3,6 +3,7 @@ import {
   getAuth, 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
+  sendPasswordResetEmail,
   signInWithPopup, 
   GoogleAuthProvider, 
   RecaptchaVerifier, 
@@ -83,12 +84,33 @@ export const sendPhoneVerificationCode = async (
   return await signInWithPhoneNumber(auth, phoneNumber, verifier);
 };
 
+export const resetUserPassword = async (email: string) => {
+  await sendPasswordResetEmail(auth, email);
+};
+
 export const logoutUser = async () => {
   await signOut(auth);
 };
 
 export const onAuthUserChange = (callback: (user: FirebaseUser | null) => void) => {
-  return onAuthStateChanged(auth, callback);
+  return onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      // Sync user profile data to Firestore
+      try {
+        await syncFirestoreDoc('users', user.uid, {
+          uid: user.uid,
+          email: user.email || '',
+          displayName: user.displayName || '',
+          phoneNumber: user.phoneNumber || '',
+          photoURL: user.photoURL || '',
+          lastLoginAt: new Date().toISOString()
+        });
+      } catch (e) {
+        console.warn('Failed to sync user profile to Firestore:', e);
+      }
+    }
+    callback(user);
+  });
 };
 
 // Firestore Sync & Storage Helpers
