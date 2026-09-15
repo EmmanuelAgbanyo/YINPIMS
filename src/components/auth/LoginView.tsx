@@ -49,6 +49,9 @@ export const LoginView: React.FC = () => {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const formatAuthError = (err: any): string => {
+    if (err?.code === 'auth/unauthorized-domain' || err?.message?.includes('unauthorized-domain')) {
+      return 'Unauthorized Domain Error: The domain hosting your app is not authorized in Firebase Console. Go to https://console.firebase.google.com/project/yinpims/authentication/settings (Authorized domains), click "Add domain", and enter "localhost" (without http:// or port numbers).';
+    }
     if (err?.code === 'auth/configuration-not-found' || err?.message?.includes('configuration-not-found')) {
       return 'Firebase Authentication Provider is not enabled yet in the Firebase Console for project "yinpims". Please enable Email/Password, Google, or Phone under Authentication > Sign-in method at https://console.firebase.google.com/project/yinpims/authentication/providers';
     }
