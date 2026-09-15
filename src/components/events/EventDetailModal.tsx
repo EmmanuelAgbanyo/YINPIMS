@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import type { Event } from '../../types';
+import { db } from '../../services/db';
+import type { Event, User } from '../../types';
 import {
   X,
   Calendar,
@@ -19,6 +20,7 @@ import {
   ShieldCheck,
   Printer,
   Download,
+  Check,
 } from 'lucide-react';
 import { FormBuilder } from '../builder/FormBuilder';
 import { AccommodationView } from '../accommodation/AccommodationView';
@@ -53,14 +55,40 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   onEditEvent,
   onOpenRegister,
 }) => {
-  const { data, setSelectedEventId, hasPermission } = useApp();
+  const { data, setSelectedEventId, hasPermission, refreshData } = useApp();
   const [activeTab, setActiveTab] = useState<EventTab>('overview');
   const [isBatchPrintOpen, setIsBatchPrintOpen] = useState(false);
+  const [isManageStaffOpen, setIsManageStaffOpen] = useState(false);
 
   if (!isOpen) return null;
 
   const event = data.events.find(e => e.id === eventId);
   if (!event) return null;
+
+  const assignedStaffList = data.users.filter(u =>
+    u.assignedEvents?.includes('*') || u.assignedEvents?.includes(event.id)
+  );
+
+  const handleToggleStaffForEvent = (user: User) => {
+    const isCurrentlyAssigned = user.assignedEvents?.includes('*') || user.assignedEvents?.includes(event.id);
+    let updatedAssignedEvents: string[];
+
+    if (user.assignedEvents?.includes('*')) {
+      // Switch from all events to all other events except this one
+      const allOtherEventIds = data.events.filter(e => e.id !== event.id).map(e => e.id);
+      updatedAssignedEvents = allOtherEventIds;
+    } else if (isCurrentlyAssigned) {
+      updatedAssignedEvents = (user.assignedEvents || []).filter(id => id !== event.id);
+    } else {
+      updatedAssignedEvents = [...(user.assignedEvents || []).filter(id => id !== '*'), event.id];
+    }
+
+    db.saveUser({
+      ...user,
+      assignedEvents: updatedAssignedEvents,
+    });
+    refreshData();
+  };
 
   const registrations = data.registrations.filter(r => r.eventId === event.id);
   const confirmedRegs = registrations.filter(r => r.status === 'Confirmed');
@@ -477,6 +505,63 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                   {event.description || 'No custom description provided for this event.'}
                 </p>
               </div>
+
+              {/* Assigned Event Staff & Coordinators Card */}
+              <div className="bg-white p-5 rounded-lg border border-[#E4E4E1] shadow-2xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-[#1C1C1A] font-heading flex items-center space-x-2">
+                      <ShieldCheck className="h-4 w-4 text-[#14595A]" />
+                      <span>Assigned Event Admins & Staff ({assignedStaffList.length})</span>
+                    </h3>
+                    <p className="text-xs text-[#6B6B66] mt-0.5">
+                      Staff members and coordinators assigned to manage check-ins and operations for this event.
+                    </p>
+                  </div>
+
+                  {hasPermission('manage_staff') && (
+                    <button
+                      onClick={() => setIsManageStaffOpen(true)}
+                      className="px-3 h-8 text-xs font-semibold bg-[#FAFAF9] border border-[#E4E4E1] text-[#14595A] rounded-md hover:bg-white hover:border-[#14595A] transition-colors cursor-pointer flex items-center space-x-1"
+                    >
+                      <UserPlus className="h-3.5 w-3.5" />
+                      <span>Assign / Manage Staff</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {assignedStaffList.length === 0 ? (
+                    <div className="col-span-full py-4 text-center text-xs text-[#6B6B66] italic">
+                      No specific staff members assigned yet.
+                    </div>
+                  ) : (
+                    assignedStaffList.map(member => (
+                      <div key={member.id} className="p-3 bg-[#FAFAF9] rounded-lg border border-[#E4E4E1] flex items-center space-x-3">
+                        <img
+                          src={member.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
+                          alt={member.name}
+                          className="h-9 w-9 rounded-full object-cover border border-[#E4E4E1] shrink-0"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs font-bold text-[#1C1C1A] truncate">{member.name}</div>
+                          <div className="text-[11px] text-[#6B6B66] truncate">{member.email}</div>
+                          <div className="mt-1 flex items-center space-x-1">
+                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-white text-[#14595A] border border-[#E4E4E1]">
+                              {member.role === 'ADMIN' ? 'Admin' : member.role === 'EVENT_COORDINATOR' ? 'Coordinator' : 'Check-In Staff'}
+                            </span>
+                            {member.assignedEvents?.includes('*') && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                                Global
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
@@ -522,6 +607,82 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           onClose={() => setIsBatchPrintOpen(false)}
           initialEventId={event.id}
         />
+      )}
+
+      {/* Manage Event Staff Modal */}
+      {isManageStaffOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl border border-[#E4E4E1] shadow-2xl w-full max-w-lg overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E4E4E1] bg-[#FAFAF9]">
+              <div>
+                <h3 className="font-heading font-bold text-base text-[#1C1C1A]">
+                  Assign Staff & Coordinators to Event
+                </h3>
+                <p className="text-xs text-[#6B6B66]">Target Event: {event.name}</p>
+              </div>
+              <button
+                onClick={() => setIsManageStaffOpen(false)}
+                className="p-1 rounded-lg text-[#6B6B66] hover:bg-[#E4E4E1] cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-3 max-h-[60vh] overflow-y-auto">
+              <p className="text-xs text-[#6B6B66] leading-relaxed">
+                Select which team members are assigned to coordinate or handle check-ins for <strong>{event.name}</strong>:
+              </p>
+
+              <div className="divide-y divide-[#E4E4E1] border border-[#E4E4E1] rounded-xl overflow-hidden">
+                {data.users.map(u => {
+                  const isAssigned = u.assignedEvents?.includes('*') || u.assignedEvents?.includes(event.id);
+
+                  return (
+                    <div key={u.id} className="p-3.5 flex items-center justify-between bg-white hover:bg-[#FAFAF9]">
+                      <div className="flex items-center space-x-3 min-w-0">
+                        <img
+                          src={u.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
+                          alt={u.name}
+                          className="h-9 w-9 rounded-full object-cover border border-[#E4E4E1] shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-[#1C1C1A] truncate">{u.name}</div>
+                          <div className="text-[11px] text-[#6B6B66] truncate">{u.email}</div>
+                          <div className="text-[10px] text-[#14595A] font-medium">
+                            Role: {u.role === 'ADMIN' ? 'Admin' : u.role === 'EVENT_COORDINATOR' ? 'Coordinator' : 'Check-In Staff'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleToggleStaffForEvent(u)}
+                        disabled={u.email.toLowerCase() === 'policyp28@gmail.com'}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors flex items-center space-x-1 ${
+                          isAssigned
+                            ? 'bg-[#14595A] text-white hover:bg-[#0E4243]'
+                            : 'bg-[#FAFAF9] text-[#6B6B66] border border-[#E4E4E1] hover:text-[#1C1C1A]'
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        {isAssigned && <Check className="h-3.5 w-3.5" />}
+                        <span>{isAssigned ? 'Assigned' : '+ Assign'}</span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-[#E4E4E1] bg-[#FAFAF9] flex justify-end">
+              <button
+                onClick={() => setIsManageStaffOpen(false)}
+                className="px-4 py-2 bg-[#14595A] text-white text-xs font-semibold rounded-xl hover:bg-[#0E4243] cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -307,6 +307,30 @@ export const TeamAccessView: React.FC = () => {
                           </span>
                         )}
                       </div>
+
+                      {/* Assigned Events Badges */}
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <span className="text-[10px] font-semibold text-[#6B6B66]">Assigned Events:</span>
+                        {member.assignedEvents?.includes('*') || !member.assignedEvents ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#14595A]/10 text-[#14595A] border border-[#14595A]/20">
+                            All Events (*)
+                          </span>
+                        ) : member.assignedEvents.length === 0 ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">
+                            No Events Assigned
+                          </span>
+                        ) : (
+                          member.assignedEvents.map(evtId => {
+                            const evt = data.events.find(e => e.id === evtId);
+                            if (!evt) return null;
+                            return (
+                              <span key={evtId} className="text-[10px] font-semibold px-2 py-0.5 rounded bg-[#FAFAF9] text-[#1C1C1A] border border-[#E4E4E1]">
+                                {evt.name}
+                              </span>
+                            );
+                          })
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -438,6 +462,75 @@ export const TeamAccessView: React.FC = () => {
                     <option value="Inactive">Inactive</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Event Scope Selection */}
+              <div className="space-y-2 pt-2 border-t border-[#E4E4E1]/80">
+                <label className="block text-xs font-semibold text-[#1C1C1A]">
+                  Assigned Event Scope
+                </label>
+                <div className="flex items-center space-x-4 text-xs">
+                  <label className="flex items-center space-x-2 font-medium text-[#1C1C1A] cursor-pointer">
+                    <input
+                      type="radio"
+                      name="eventScope"
+                      checked={assignedEvents.includes('*')}
+                      disabled={editingMember?.email.toLowerCase() === 'policyp28@gmail.com'}
+                      onChange={() => setAssignedEvents(['*'])}
+                      className="text-[#14595A] focus:ring-[#14595A]"
+                    />
+                    <span>All Events (Full System Access)</span>
+                  </label>
+
+                  <label className="flex items-center space-x-2 font-medium text-[#1C1C1A] cursor-pointer">
+                    <input
+                      type="radio"
+                      name="eventScope"
+                      checked={!assignedEvents.includes('*')}
+                      disabled={editingMember?.email.toLowerCase() === 'policyp28@gmail.com'}
+                      onChange={() => {
+                        const firstEvt = data.events[0]?.id;
+                        setAssignedEvents(firstEvt ? [firstEvt] : []);
+                      }}
+                      className="text-[#14595A] focus:ring-[#14595A]"
+                    />
+                    <span>Specific Event(s) Only</span>
+                  </label>
+                </div>
+
+                {!assignedEvents.includes('*') && (
+                  <div className="p-3 bg-[#FAFAF9] border border-[#E4E4E1] rounded-xl space-y-2 max-h-40 overflow-y-auto">
+                    <div className="text-[11px] font-bold text-[#6B6B66] uppercase tracking-wider">
+                      Select Authorized Events:
+                    </div>
+                    {data.events.length === 0 ? (
+                      <p className="text-xs text-[#6B6B66] italic">No events currently created in system.</p>
+                    ) : (
+                      data.events.map(evt => {
+                        const isChecked = assignedEvents.includes(evt.id);
+                        return (
+                          <label key={evt.id} className="flex items-center space-x-2 text-xs text-[#1C1C1A] cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={e => {
+                                if (e.target.checked) {
+                                  setAssignedEvents([...assignedEvents.filter(id => id !== '*'), evt.id]);
+                                } else {
+                                  const next = assignedEvents.filter(id => id !== evt.id);
+                                  setAssignedEvents(next.length === 0 ? ['*'] : next);
+                                }
+                              }}
+                              className="rounded text-[#14595A] focus:ring-[#14595A]"
+                            />
+                            <span className="font-medium">{evt.name}</span>
+                            <span className="text-[10px] text-[#6B6B66]">({evt.status})</span>
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="pt-4 border-t border-[#E4E4E1] flex justify-end space-x-2">

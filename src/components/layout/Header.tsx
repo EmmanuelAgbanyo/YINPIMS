@@ -44,6 +44,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   const {
     data,
+    currentUser,
     activeRole,
     selectedEventId,
     setCurrentUserRole,
@@ -53,6 +54,11 @@ export const Header: React.FC<HeaderProps> = ({
     syncConfig,
     setIsSyncModalOpen,
   } = useApp();
+
+  const authorizedEvents = data.events.filter(e => {
+    if (!currentUser?.assignedEvents || currentUser.assignedEvents.includes('*')) return true;
+    return currentUser.assignedEvents.includes(e.id);
+  });
 
   const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setCurrentUserRole(e.target.value as UserRole);
@@ -110,8 +116,8 @@ export const Header: React.FC<HeaderProps> = ({
             onChange={handleEventChange}
             className="h-9 w-36 sm:w-56 md:w-64 rounded-md border border-[#E4E4E1] bg-[#FAFAF9] pl-8 pr-7 text-xs font-semibold text-[#1C1C1A] transition-colors focus:border-[#14595A] focus:bg-white focus:outline-none cursor-pointer truncate"
           >
-            <option value="all">All Events ({data.events.length})</option>
-            {data.events.map(event => (
+            <option value="all">All Events ({authorizedEvents.length})</option>
+            {authorizedEvents.map(event => (
               <option key={event.id} value={event.id}>
                 {event.name} ({event.status})
               </option>
