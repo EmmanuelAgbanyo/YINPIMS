@@ -48,6 +48,22 @@ export const LoginView: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  const formatAuthError = (err: any): string => {
+    if (err?.code === 'auth/configuration-not-found' || err?.message?.includes('configuration-not-found')) {
+      return 'Firebase Authentication Provider is not enabled yet in the Firebase Console for project "yinpims". Please enable Email/Password, Google, or Phone under Authentication > Sign-in method at https://console.firebase.google.com/project/yinpims/authentication/providers';
+    }
+    if (err?.code === 'auth/invalid-credential' || err?.code === 'auth/wrong-password' || err?.code === 'auth/user-not-found') {
+      return 'Invalid email or password. Please check your credentials or register a new account.';
+    }
+    if (err?.code === 'auth/email-already-in-use') {
+      return 'An account with this email address already exists. Please sign in instead.';
+    }
+    if (err?.code === 'auth/weak-password') {
+      return 'Password should be at least 6 characters long.';
+    }
+    return err?.message || 'Authentication failed.';
+  };
+
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -57,11 +73,7 @@ export const LoginView: React.FC = () => {
       await signInWithEmail(email, password);
       setSuccessMsg(email.toLowerCase() === 'policyp28@gmail.com' ? 'Welcome Super Admin!' : 'Sign in successful!');
     } catch (err: any) {
-      if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
-        setError('Invalid email or password. Please check credentials or register.');
-      } else {
-        setError(err.message || 'Failed to sign in');
-      }
+      setError(formatAuthError(err));
     } finally {
       setLoading(false);
     }
@@ -76,13 +88,7 @@ export const LoginView: React.FC = () => {
       await signUpWithEmail(email, password, displayName);
       setSuccessMsg('Account created successfully! Logging you in...');
     } catch (err: any) {
-      if (err.code === 'auth/email-already-in-use') {
-        setError('An account with this email address already exists. Please sign in instead.');
-      } else if (err.code === 'auth/weak-password') {
-        setError('Password should be at least 6 characters long.');
-      } else {
-        setError(err.message || 'Failed to create account');
-      }
+      setError(formatAuthError(err));
     } finally {
       setLoading(false);
     }
@@ -101,7 +107,7 @@ export const LoginView: React.FC = () => {
       await resetUserPassword(email);
       setSuccessMsg(`Password reset instructions sent to ${email}. Check your inbox!`);
     } catch (err: any) {
-      setError(err.message || 'Failed to send password reset email');
+      setError(formatAuthError(err));
     } finally {
       setLoading(false);
     }
@@ -115,7 +121,7 @@ export const LoginView: React.FC = () => {
       await signInWithGoogle();
       setSuccessMsg('Successfully authenticated with Google!');
     } catch (err: any) {
-      setError(err.message || 'Google Sign-In failed');
+      setError(formatAuthError(err));
     } finally {
       setLoading(false);
     }
@@ -136,7 +142,7 @@ export const LoginView: React.FC = () => {
       setConfirmationResult(result);
       setSuccessMsg('SMS code sent to your phone!');
     } catch (err: any) {
-      setError(err.message || 'Failed to send SMS code.');
+      setError(formatAuthError(err));
     } finally {
       setLoading(false);
     }

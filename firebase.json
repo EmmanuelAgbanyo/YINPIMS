@@ -1,0 +1,16 @@
+{
+  "auth": {
+    "authorizedDomains": [
+      "localhost",
+      "yinpims.firebaseapp.com",
+      "yinpims.web.app"
+    ],
+    "providers": {
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "YIN-PIMS",
+        "supportEmail": "policyp28@gmail.com"
+      }
+    }
+  }
+}
