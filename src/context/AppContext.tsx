@@ -4,6 +4,10 @@ import type { DatabaseSchema } from '../services/db';
 import type { User, UserRole, Event } from '../types';
 import { syncService } from '../services/sync';
 import type { SyncStatus, SyncConfig } from '../services/sync';
+import { onAuthUserChange } from '../services/firebase';
+import type { User as FirebaseUser } from 'firebase/auth';
+
+const SUPERADMIN_EMAIL = 'policyp28@gmail.com';
 
 interface AppContextType {
   data: DatabaseSchema;
@@ -31,9 +35,10 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [data, setData] = useState<DatabaseSchema>(db.getData());
   const [currentUser, setCurrentUser] = useState<User>(data.users[0] || {
-    id: 'usr-default',
-    name: 'Default User',
-    email: 'user@example.com',
+    id: 'usr-admin',
+    name: 'Super Admin',
+    email: SUPERADMIN_EMAIL,
+    phone: '',
     role: 'ADMIN',
     organizationId: 'org-001',
     assignedEvents: ['*'],
@@ -49,6 +54,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   useEffect(() => {
+    // Listen for Firebase Auth user changes
+    const unsubscribeAuth = onAuthUserChange((fbUser: FirebaseUser | null) => {
+      if (fbUser) {
+        const isSuperAdmin = fbUser.email?.toLowerCase() === SUPERADMIN_EMAIL.toLowerCase();
+        setCurrentUser({
+          id: fbUser.uid,
+          name: fbUser.displayName || (isSuperAdmin ? 'Super Admin' : fbUser.email || 'Authorized User'),
+          email: fbUser.email || '',
+          phone: fbUser.phoneNumber || '',
+          role: isSuperAdmin ? 'ADMIN' : 'ADMIN', // Default authenticated users to ADMIN unless role simulator is used
+          organizationId: 'org-001',
+          assignedEvents: ['*'],
+          status: 'Active',
+          avatarUrl: fbUser.photoURL || undefined,
+        });
+      }
+    });
+
     // Listen for sync status changes
     const unsubscribeStatus = syncService.subscribeStatus((newStatus) => {
       setSyncStatus(newStatus);
@@ -62,6 +85,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     window.addEventListener('PIMS_LOCAL_DATA_REFRESH', handleDataRefresh);
 
     return () => {
+      unsubscribeAuth();
       unsubscribeStatus();
       window.removeEventListener('PIMS_LOCAL_DATA_REFRESH', handleDataRefresh);
     };

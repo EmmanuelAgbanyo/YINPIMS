@@ -23,11 +23,18 @@ import { CommunicationModal } from './components/communications/CommunicationMod
 import { ExportModal } from './components/reports/ExportModal';
 import { CloudSyncModal } from './components/common/CloudSyncModal';
 import { AuthModal } from './components/auth/AuthModal';
+import { LoginView } from './components/auth/LoginView';
+import { auth, onAuthUserChange } from './services/firebase';
+import type { User as FirebaseUser } from 'firebase/auth';
 import type { Event } from './types';
 
 const MainLayout: React.FC = () => {
   const { activeRole } = useApp();
   const [activeTab, setActiveTab] = useState<NavTab>('overview');
+
+  // Firebase Auth State Guard
+  const [authUser, setAuthUser] = useState<FirebaseUser | null>(auth.currentUser);
+  const [authInitializing, setAuthInitializing] = useState<boolean>(true);
 
   // Navigation Collapse & Drawer State
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -45,6 +52,15 @@ const MainLayout: React.FC = () => {
   const [isCommModalOpen, setIsCommModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [formBuilderEventId, setFormBuilderEventId] = useState<string | undefined>(undefined);
+
+  // Auth User Change Subscription
+  useEffect(() => {
+    const unsub = onAuthUserChange((user) => {
+      setAuthUser(user);
+      setAuthInitializing(false);
+    });
+    return () => unsub();
+  }, []);
 
   // Global Keyboard Shortcut Listener for Cmd+K / Ctrl+K
   useEffect(() => {
@@ -64,6 +80,23 @@ const MainLayout: React.FC = () => {
       setActiveTab('checkin');
     }
   }, [activeRole, activeTab]);
+
+  // Render initial loading spinner while restoring auth state
+  if (authInitializing) {
+    return (
+      <div className="min-h-screen bg-[#FAFAF9] flex items-center justify-center font-body text-[#1C1C1A]">
+        <div className="text-center space-y-3">
+          <div className="inline-block h-10 w-10 animate-spin rounded-full border-4 border-[#14595A] border-r-transparent" />
+          <p className="text-xs font-semibold text-[#6B6B66]">Loading YIN-PIMS System...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If user is not authenticated, show full-screen LoginView
+  if (!authUser) {
+    return <LoginView />;
+  }
 
   return (
     <div className="min-h-screen bg-[#FAFAF9] flex flex-col font-body text-[#1C1C1A]">
