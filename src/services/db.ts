@@ -10,7 +10,7 @@ import type {
 } from '../types';
 import { syncService } from './sync';
 
-const STORAGE_KEY = 'PIMS_DATA_V1';
+const STORAGE_KEY = 'PIMS_DATA_V2';
 
 export interface DatabaseSchema {
   organization: Organization;
@@ -28,7 +28,7 @@ const INITIAL_SEED_DATA: DatabaseSchema = {
     id: 'org-001',
     name: 'Global Innovation & Leadership Institute',
     description: 'Empowering delegates and professionals worldwide through high-impact conferences and workshops.',
-    createdAt: '2025-01-15',
+    createdAt: '2026-01-15',
     settings: {
       allowWaitlist: true,
       requirePhone: true,
@@ -38,384 +38,24 @@ const INITIAL_SEED_DATA: DatabaseSchema = {
 
   users: [
     {
-      id: 'usr-admin',
-      name: 'Sarah Jenkins',
-      email: 'sarah.jenkins@gili-institute.org',
-      phone: '+1 (555) 234-5678',
+      id: 'usr-superadmin',
+      name: 'Super Admin',
+      email: 'policyp28@gmail.com',
+      phone: '+1 (555) 000-0000',
       role: 'ADMIN',
       organizationId: 'org-001',
       assignedEvents: ['*'],
       status: 'Active',
-      avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
-    },
-    {
-      id: 'usr-coord',
-      name: 'David Chen',
-      email: 'david.chen@gili-institute.org',
-      phone: '+1 (555) 876-5432',
-      role: 'EVENT_COORDINATOR',
-      organizationId: 'org-001',
-      assignedEvents: ['evt-101', 'evt-102', 'evt-103'],
-      status: 'Active',
-      avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-    },
-    {
-      id: 'usr-checkin',
-      name: 'Alex Rivera',
-      email: 'alex.rivera@gili-institute.org',
-      phone: '+1 (555) 345-6789',
-      role: 'CHECKIN_STAFF',
-      organizationId: 'org-001',
-      assignedEvents: ['evt-101', 'evt-102'],
-      status: 'Active',
-      avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
+      avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
     },
   ],
 
-  events: [
-    {
-      id: 'evt-101',
-      name: 'Global Youth Innovation Summit 2026',
-      location: 'Grand Horizon Convention Center, San Francisco, CA',
-      type: 'Conference',
-      isMultiDay: true,
-      startDate: '2026-09-15',
-      endDate: '2026-09-18',
-      capacity: 50,
-      registrationStatus: 'Open',
-      accommodationEnabled: true,
-      status: 'Active',
-      createdAt: '2026-06-01',
-      updatedAt: '2026-09-01',
-      description: 'Annual gathering of young innovators, tech entrepreneurs, and policy leaders.',
-    },
-    {
-      id: 'evt-102',
-      name: 'Advanced Web Security & DevSecOps Workshop',
-      location: 'TechHub Innovation Lab, Austin, TX',
-      type: 'Workshop',
-      isMultiDay: false,
-      startDate: '2026-09-10',
-      endDate: '2026-09-10',
-      capacity: 5, // Small capacity to showcase waitlist mechanism!
-      registrationStatus: 'Open',
-      accommodationEnabled: false,
-      status: 'Active',
-      createdAt: '2026-07-10',
-      updatedAt: '2026-09-02',
-      description: 'Hands-on intensive workshop covering modern application security controls and threat modeling.',
-    },
-    {
-      id: 'evt-103',
-      name: 'Executive Leadership & Governance Seminar',
-      location: 'Beacon Center, Chicago, IL',
-      type: 'Training',
-      isMultiDay: true,
-      startDate: '2026-10-05',
-      endDate: '2026-10-07',
-      capacity: 30,
-      registrationStatus: 'Open',
-      accommodationEnabled: true,
-      status: 'Active',
-      createdAt: '2026-08-01',
-      updatedAt: '2026-08-25',
-      description: 'Strategic leadership program tailored for senior executives and board directors.',
-    },
-    {
-      id: 'evt-104',
-      name: 'Annual AI & Ethics Symposium 2026',
-      location: 'Metro Center Hall, New York, NY',
-      type: 'Meeting',
-      isMultiDay: false,
-      startDate: '2026-08-20',
-      endDate: '2026-08-20',
-      capacity: 40,
-      registrationStatus: 'Closed',
-      accommodationEnabled: false,
-      status: 'Completed',
-      createdAt: '2026-05-10',
-      updatedAt: '2026-08-21',
-      description: 'Completed symposium reviewing ethical frameworks in high-stakes artificial intelligence deployment.',
-    },
-  ],
-
-  questions: [
-    // Event 101 Questions
-    { id: 'q-101-1', eventId: 'evt-101', label: 'Full Name', type: 'short_text', required: true, position: 1, isSystemQuestion: true },
-    { id: 'q-101-2', eventId: 'evt-101', label: 'Email Address', type: 'email', required: true, position: 2, isSystemQuestion: true },
-    { id: 'q-101-3', eventId: 'evt-101', label: 'Phone Number', type: 'phone', required: true, position: 3, isSystemQuestion: true },
-    { id: 'q-101-4', eventId: 'evt-101', label: 'Gender', type: 'dropdown', required: true, options: ['Male', 'Female', 'Other', 'Prefer not to say'], position: 4, isSystemQuestion: true },
-    { id: 'q-101-5', eventId: 'evt-101', label: 'Do you need accommodation?', type: 'multiple_choice', required: true, options: ['Yes', 'No'], position: 5, isSystemQuestion: true },
-    { id: 'q-101-6', eventId: 'evt-101', label: 'Organization or Institution', type: 'short_text', required: true, position: 6 },
-    { id: 'q-101-7', eventId: 'evt-101', label: 'Dietary Restrictions', type: 'checkboxes', required: false, options: ['Vegetarian', 'Vegan', 'Gluten-Free', 'Halal', 'Kosher', 'None'], position: 7 },
-    { id: 'q-101-8', eventId: 'evt-101', label: 'Brief Statement of Purpose', type: 'paragraph', required: false, position: 8 },
-
-    // Event 102 Questions
-    { id: 'q-102-1', eventId: 'evt-102', label: 'Full Name', type: 'short_text', required: true, position: 1, isSystemQuestion: true },
-    { id: 'q-102-2', eventId: 'evt-102', label: 'Email Address', type: 'email', required: true, position: 2, isSystemQuestion: true },
-    { id: 'q-102-3', eventId: 'evt-102', label: 'Phone Number', type: 'phone', required: true, position: 3, isSystemQuestion: true },
-    { id: 'q-102-4', eventId: 'evt-102', label: 'Current Role & Technical Stack', type: 'short_text', required: true, position: 4 },
-  ],
-
-  participants: [
-    { id: 'prt-001', fullName: 'Elena Rostova', email: 'elena.rostova@techspark.io', phone: '+1 (555) 912-3456', gender: 'Female', organization: 'TechSpark Labs', jobTitle: 'Lead Software Architect', createdAt: '2026-06-10' },
-    { id: 'prt-002', fullName: 'Marcus Vance', email: 'marcus.vance@apexglobal.com', phone: '+1 (555) 823-4567', gender: 'Male', organization: 'Apex Global Partners', jobTitle: 'VP of Product Strategy', createdAt: '2026-06-12' },
-    { id: 'prt-003', fullName: 'Amara Okafor', email: 'amara.okafor@innovateafrica.org', phone: '+1 (555) 734-5678', gender: 'Female', organization: 'Innovate Africa', jobTitle: 'Program Director', createdAt: '2026-06-15' },
-    { id: 'prt-004', fullName: 'Liam O\'Connor', email: 'liam.oconnor@dublintech.ie', phone: '+1 (555) 645-6789', gender: 'Male', organization: 'Dublin Tech Hub', jobTitle: 'DevSecOps Specialist', createdAt: '2026-06-18' },
-    { id: 'prt-005', fullName: 'Sophia Chen', email: 'sophia.chen@quantumventures.com', phone: '+1 (555) 556-7890', gender: 'Female', organization: 'Quantum Ventures', jobTitle: 'Investment Associate', createdAt: '2026-06-20' },
-    { id: 'prt-006', fullName: 'Tariq Al-Mansoor', email: 'tariq.mansoor@futuregen.ae', phone: '+1 (555) 467-8901', gender: 'Male', organization: 'FutureGen Dubai', jobTitle: 'Innovation Analyst', createdAt: '2026-06-22' },
-    { id: 'prt-007', fullName: 'Chloe Dubois', email: 'chloe.dubois@paris-ai.fr', phone: '+1 (555) 378-9012', gender: 'Female', organization: 'Paris AI Collective', jobTitle: 'Research Fellow', createdAt: '2026-06-25' },
-    { id: 'prt-008', fullName: 'Benjamin Hayes', email: 'ben.hayes@cyberdefense.gov', phone: '+1 (555) 289-0123', gender: 'Male', organization: 'National Cyber Defense', jobTitle: 'Security Researcher', createdAt: '2026-06-28' },
-  ],
-
-  registrations: [
-    // Event 101 (Summit) Registrations
-    {
-      id: 'reg-101-01',
-      eventId: 'evt-101',
-      participantId: 'prt-001',
-      status: 'Confirmed',
-      registrationDate: '2026-06-10T10:30:00Z',
-      checkInStatus: 'Checked In',
-      checkInTimestamp: '2026-09-15T08:45:12Z',
-      qrIdentifier: 'QR-PIMS-EVT101-PRT001-REG01',
-      accommodationRequired: true,
-      roomAssignmentId: 'room-101',
-      responses: {
-        'q-101-1': 'Elena Rostova',
-        'q-101-2': 'elena.rostova@techspark.io',
-        'q-101-3': '+1 (555) 912-3456',
-        'q-101-4': 'Female',
-        'q-101-5': 'Yes',
-        'q-101-6': 'TechSpark Labs',
-        'q-101-7': ['Vegetarian'],
-      },
-    },
-    {
-      id: 'reg-101-02',
-      eventId: 'evt-101',
-      participantId: 'prt-002',
-      status: 'Confirmed',
-      registrationDate: '2026-06-12T14:15:00Z',
-      checkInStatus: 'Not Checked In',
-      qrIdentifier: 'QR-PIMS-EVT101-PRT002-REG02',
-      accommodationRequired: true,
-      roomAssignmentId: 'room-102',
-      responses: {
-        'q-101-1': 'Marcus Vance',
-        'q-101-2': 'marcus.vance@apexglobal.com',
-        'q-101-3': '+1 (555) 823-4567',
-        'q-101-4': 'Male',
-        'q-101-5': 'Yes',
-        'q-101-6': 'Apex Global Partners',
-        'q-101-7': ['None'],
-      },
-    },
-    {
-      id: 'reg-101-03',
-      eventId: 'evt-101',
-      participantId: 'prt-003',
-      status: 'Confirmed',
-      registrationDate: '2026-06-15T09:00:00Z',
-      checkInStatus: 'Checked In',
-      checkInTimestamp: '2026-09-15T09:12:05Z',
-      qrIdentifier: 'QR-PIMS-EVT101-PRT003-REG03',
-      accommodationRequired: true,
-      roomAssignmentId: 'room-101',
-      responses: {
-        'q-101-1': 'Amara Okafor',
-        'q-101-2': 'amara.okafor@innovateafrica.org',
-        'q-101-3': '+1 (555) 734-5678',
-        'q-101-4': 'Female',
-        'q-101-5': 'Yes',
-        'q-101-6': 'Innovate Africa',
-        'q-101-7': ['Gluten-Free'],
-      },
-    },
-    {
-      id: 'reg-101-04',
-      eventId: 'evt-101',
-      participantId: 'prt-005',
-      status: 'Confirmed',
-      registrationDate: '2026-06-20T11:20:00Z',
-      checkInStatus: 'Not Checked In',
-      qrIdentifier: 'QR-PIMS-EVT101-PRT005-REG04',
-      accommodationRequired: true,
-      roomAssignmentId: 'room-103',
-      responses: {
-        'q-101-1': 'Sophia Chen',
-        'q-101-2': 'sophia.chen@quantumventures.com',
-        'q-101-3': '+1 (555) 556-7890',
-        'q-101-4': 'Female',
-        'q-101-5': 'Yes',
-        'q-101-6': 'Quantum Ventures',
-      },
-    },
-
-    // Event 102 (Security Workshop - Capacity 5 limit)
-    {
-      id: 'reg-102-01',
-      eventId: 'evt-102',
-      participantId: 'prt-004',
-      status: 'Confirmed',
-      registrationDate: '2026-07-11T08:00:00Z',
-      checkInStatus: 'Checked In',
-      checkInTimestamp: '2026-09-10T08:50:00Z',
-      qrIdentifier: 'QR-PIMS-EVT102-PRT004-REG01',
-      accommodationRequired: false,
-      responses: { 'q-102-1': 'Liam O\'Connor', 'q-102-2': 'liam.oconnor@dublintech.ie' },
-    },
-    {
-      id: 'reg-102-02',
-      eventId: 'evt-102',
-      participantId: 'prt-008',
-      status: 'Confirmed',
-      registrationDate: '2026-07-11T08:05:00Z',
-      checkInStatus: 'Not Checked In',
-      qrIdentifier: 'QR-PIMS-EVT102-PRT008-REG02',
-      accommodationRequired: false,
-      responses: { 'q-102-1': 'Benjamin Hayes', 'q-102-2': 'ben.hayes@cyberdefense.gov' },
-    },
-    {
-      id: 'reg-102-03',
-      eventId: 'evt-102',
-      participantId: 'prt-001',
-      status: 'Confirmed',
-      registrationDate: '2026-07-11T08:10:00Z',
-      checkInStatus: 'Not Checked In',
-      qrIdentifier: 'QR-PIMS-EVT102-PRT001-REG03',
-      accommodationRequired: false,
-      responses: { 'q-102-1': 'Elena Rostova', 'q-102-2': 'elena.rostova@techspark.io' },
-    },
-    {
-      id: 'reg-102-04',
-      eventId: 'evt-102',
-      participantId: 'prt-002',
-      status: 'Confirmed',
-      registrationDate: '2026-07-11T08:15:00Z',
-      checkInStatus: 'Not Checked In',
-      qrIdentifier: 'QR-PIMS-EVT102-PRT002-REG04',
-      accommodationRequired: false,
-      responses: { 'q-102-1': 'Marcus Vance', 'q-102-2': 'marcus.vance@apexglobal.com' },
-    },
-    {
-      id: 'reg-102-05',
-      eventId: 'evt-102',
-      participantId: 'prt-006',
-      status: 'Confirmed',
-      registrationDate: '2026-07-11T08:20:00Z',
-      checkInStatus: 'Not Checked In',
-      qrIdentifier: 'QR-PIMS-EVT102-PRT006-REG05',
-      accommodationRequired: false,
-      responses: { 'q-102-1': 'Tariq Al-Mansoor', 'q-102-2': 'tariq.mansoor@futuregen.ae' },
-    },
-    // Waitlisted participants for Event 102!
-    {
-      id: 'reg-102-06',
-      eventId: 'evt-102',
-      participantId: 'prt-007',
-      status: 'Waitlisted',
-      waitlistPosition: 1,
-      registrationDate: '2026-07-11T09:30:00Z',
-      checkInStatus: 'Not Checked In',
-      qrIdentifier: 'QR-PIMS-EVT102-PRT007-REG06',
-      accommodationRequired: false,
-      responses: { 'q-102-1': 'Chloe Dubois', 'q-102-2': 'chloe.dubois@paris-ai.fr' },
-    },
-
-    // Event 104 (Completed event stats)
-    {
-      id: 'reg-104-01',
-      eventId: 'evt-104',
-      participantId: 'prt-001',
-      status: 'Confirmed',
-      registrationDate: '2026-05-15T10:00:00Z',
-      checkInStatus: 'Checked In',
-      checkInTimestamp: '2026-08-20T08:40:00Z',
-      qrIdentifier: 'QR-PIMS-EVT104-PRT001-REG01',
-      accommodationRequired: false,
-      responses: {},
-    },
-    {
-      id: 'reg-104-02',
-      eventId: 'evt-104',
-      participantId: 'prt-003',
-      status: 'Confirmed',
-      registrationDate: '2026-05-16T11:00:00Z',
-      checkInStatus: 'Checked In',
-      checkInTimestamp: '2026-08-20T08:50:00Z',
-      qrIdentifier: 'QR-PIMS-EVT104-PRT003-REG02',
-      accommodationRequired: false,
-      responses: {},
-    },
-    {
-      id: 'reg-104-03',
-      eventId: 'evt-104',
-      participantId: 'prt-005',
-      status: 'Confirmed',
-      registrationDate: '2026-05-17T12:00:00Z',
-      checkInStatus: 'Not Checked In', // No show
-      qrIdentifier: 'QR-PIMS-EVT104-PRT005-REG03',
-      accommodationRequired: false,
-      responses: {},
-    },
-  ],
-
-  rooms: [
-    {
-      id: 'room-101',
-      eventId: 'evt-101',
-      roomNumber: 'Suite 204',
-      capacity: 2,
-      genderGroup: 'Female',
-      assignedParticipantIds: ['prt-001', 'prt-003'],
-    },
-    {
-      id: 'room-102',
-      eventId: 'evt-101',
-      roomNumber: 'Suite 205',
-      capacity: 2,
-      genderGroup: 'Male',
-      assignedParticipantIds: ['prt-002'],
-    },
-    {
-      id: 'room-103',
-      eventId: 'evt-101',
-      roomNumber: 'Executive Suite 301',
-      capacity: 3,
-      genderGroup: 'Female',
-      assignedParticipantIds: ['prt-005'],
-    },
-  ],
-
-  logs: [
-    {
-      id: 'log-001',
-      eventId: 'evt-101',
-      participantId: 'prt-001',
-      participantName: 'Elena Rostova',
-      participantEmail: 'elena.rostova@techspark.io',
-      type: 'Confirmation',
-      channel: 'Email',
-      sentAt: '2026-06-10T10:31:00Z',
-      status: 'Simulated',
-      subject: 'Registration Confirmed: Global Youth Innovation Summit 2026',
-      content: 'Thank you for registering! Your Digital ID Badge and QR Code are ready.',
-    },
-    {
-      id: 'log-002',
-      eventId: 'evt-102',
-      participantId: 'prt-007',
-      participantName: 'Chloe Dubois',
-      participantEmail: 'chloe.dubois@paris-ai.fr',
-      type: 'Reminder',
-      channel: 'Email',
-      sentAt: '2026-07-11T09:31:00Z',
-      status: 'Simulated',
-      subject: 'Waitlist Confirmation #1 - Web Security Workshop',
-      content: 'You have been placed on the waitlist at position #1. We will notify you if a slot opens up.',
-    },
-  ],
+  events: [],
+  questions: [],
+  participants: [],
+  registrations: [],
+  rooms: [],
+  logs: [],
 };
 
 class StorageService {
@@ -504,6 +144,46 @@ class StorageService {
     const updated = updater(this.data);
     this.saveToStorage(updated);
     return this.data;
+  }
+
+  // --- USERS & TEAM ---
+  public getUsers(): User[] {
+    return this.data.users;
+  }
+
+  public saveUser(userData: Partial<User> & { name: string; email: string }): User {
+    const isNew = !userData.id;
+    const userId = userData.id || `usr-${Date.now()}`;
+    const newUser: User = {
+      id: userId,
+      name: userData.name,
+      email: userData.email.trim().toLowerCase(),
+      phone: userData.phone || '',
+      role: userData.role || 'EVENT_COORDINATOR',
+      organizationId: userData.organizationId || 'org-001',
+      assignedEvents: userData.assignedEvents || ['*'],
+      status: userData.status || 'Active',
+      avatarUrl: userData.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+    };
+
+    let users = [...this.data.users];
+    if (isNew) {
+      users.unshift(newUser);
+    } else {
+      users = users.map(u => (u.id === userId ? newUser : u));
+    }
+
+    this.saveToStorage({ ...this.data, users });
+    return newUser;
+  }
+
+  public deleteUser(userId: string): void {
+    const targetUser = this.data.users.find(u => u.id === userId);
+    if (targetUser?.email?.toLowerCase() === 'policyp28@gmail.com') {
+      throw new Error('Super Admin account (policyp28@gmail.com) cannot be deleted.');
+    }
+    const users = this.data.users.filter(u => u.id !== userId);
+    this.saveToStorage({ ...this.data, users });
   }
 
   // --- EVENTS ---
