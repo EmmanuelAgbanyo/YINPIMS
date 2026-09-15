@@ -7,6 +7,7 @@ import type {
   RegistrationQuestion,
   AccommodationRoom,
   CommunicationLog,
+  ParticipantBadgeType,
 } from '../types';
 import { syncService } from './sync';
 
@@ -304,7 +305,7 @@ class StorageService {
 
   public registerParticipant(
     eventId: string,
-    participantData: { fullName: string; email: string; phone: string; gender: string; organization?: string; jobTitle?: string },
+    participantData: { fullName: string; email: string; phone: string; gender: string; organization?: string; jobTitle?: string; badgeType?: ParticipantBadgeType },
     responses: Record<string, string | string[]>,
     accommodationRequired: boolean = false
   ): { registration: Registration; participant: Participant; isDuplicate: boolean; isWaitlisted: boolean; waitlistPosition?: number } {
@@ -336,7 +337,14 @@ class StorageService {
     // Save or update participant profile
     let participant: Participant;
     if (duplicateParticipant) {
-      participant = duplicateParticipant;
+      participant = {
+        ...duplicateParticipant,
+        badgeType: participantData.badgeType || duplicateParticipant.badgeType || 'Delegate',
+      };
+      const pIndex = this.data.participants.findIndex(p => p.id === duplicateParticipant.id);
+      if (pIndex !== -1) {
+        this.data.participants[pIndex] = participant;
+      }
     } else {
       participant = {
         id: `prt-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -344,6 +352,7 @@ class StorageService {
         email: normalizedEmail,
         phone: normalizedPhone,
         gender: (participantData.gender as any) || 'Prefer not to say',
+        badgeType: participantData.badgeType || 'Delegate',
         organization: participantData.organization,
         jobTitle: participantData.jobTitle,
         createdAt: new Date().toISOString(),
@@ -373,6 +382,7 @@ class StorageService {
       eventId,
       participantId: participant.id,
       status,
+      badgeType: participantData.badgeType || participant.badgeType || 'Delegate',
       registrationDate: new Date().toISOString(),
       checkInStatus: 'Not Checked In',
       waitlistPosition,

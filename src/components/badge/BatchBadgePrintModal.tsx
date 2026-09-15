@@ -377,36 +377,42 @@ export const BatchBadgePrintModal: React.FC<BatchBadgePrintModalProps> = ({
                       </div>
 
                       {/* Badge Top Header */}
-                      <div className="bg-[#14595A] text-white p-2.5 rounded-md text-center space-y-0.5" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        <div className="flex items-center justify-center space-x-1 text-[9px] font-bold uppercase tracking-wider text-white/80">
-                          <ShieldCheck className="h-3 w-3" />
-                          <span>Delegate Pass</span>
+                      <div className="bg-[#14595A] text-white p-2 rounded-md text-center space-y-0.5" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                        <div className="flex items-center justify-center space-x-1 text-[8px] font-bold uppercase tracking-wider text-white/80">
+                          <ShieldCheck className="h-2.5 w-2.5" />
+                          <span>Official Pass</span>
                         </div>
-                        <h3 className="font-heading font-bold text-xs leading-tight text-white line-clamp-1 px-1">
+                        <h3 className="font-heading font-bold text-[11px] leading-tight text-white line-clamp-1 px-1">
                           {event.name}
                         </h3>
-                        <p className="text-[9px] text-white/80 font-medium">
-                          {new Date(event.startDate).toLocaleDateString(undefined, {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric',
-                          })}
-                        </p>
+                      </div>
+
+                      {/* Prominent Badge Title Category Banner */}
+                      <div 
+                        className={`w-full py-1 text-center text-[9px] font-extrabold font-heading tracking-widest uppercase shadow-2xs ${
+                          reg.badgeType === 'Speaker' ? 'bg-amber-600 text-white' :
+                          reg.badgeType === 'Contestant' ? 'bg-purple-600 text-white' :
+                          reg.badgeType === 'Volunteer' ? 'bg-emerald-600 text-white' :
+                          reg.badgeType === 'Staff' ? 'bg-[#14595A] text-white' : 'bg-slate-800 text-white'
+                        }`}
+                        style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}
+                      >
+                        ★ {reg.badgeType || participant.badgeType || 'DELEGATE'} ★
                       </div>
 
                       {/* Badge Main Body */}
-                      <div className="py-2 px-1 text-center flex-1 flex flex-col items-center justify-center space-y-2">
+                      <div className="py-2 px-1 text-center flex-1 flex flex-col items-center justify-center space-y-1.5">
                         <div>
-                          <h2 className="font-heading font-bold text-base text-[#1C1C1A] tracking-tight leading-snug">
+                          <h2 className="font-heading font-bold text-sm text-[#1C1C1A] tracking-tight leading-snug">
                             {participant.fullName}
                           </h2>
                           {participant.organization && (
-                            <p className="text-[11px] font-semibold text-[#14595A] mt-0.5 line-clamp-1">
+                            <p className="text-[10px] font-semibold text-[#14595A] mt-0.5 line-clamp-1">
                               {participant.organization}
                             </p>
                           )}
                           {participant.jobTitle && (
-                            <p className="text-[10px] text-[#6B6B66] line-clamp-1">
+                            <p className="text-[9px] text-[#6B6B66] line-clamp-1">
                               {participant.jobTitle}
                             </p>
                           )}

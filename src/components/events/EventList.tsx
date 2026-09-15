@@ -14,9 +14,11 @@ import {
   UserPlus,
   ExternalLink,
   Building,
+  Download,
 } from 'lucide-react';
 import { ConfirmationModal } from '../common/ConfirmationModal';
 import { EventDetailModal } from './EventDetailModal';
+import { exportParticipantsCSV } from '../../utils/exportUtils';
 
 interface EventListProps {
   onOpenCreate: () => void;
@@ -268,6 +270,18 @@ export const EventList: React.FC<EventListProps> = ({
                         <span>Form</span>
                       </button>
                     )}
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        exportParticipantsCSV(data, event.id);
+                      }}
+                      title="Export Event Participants to CSV"
+                      className="flex items-center space-x-1 h-7 px-2 text-[11px] font-medium text-[#2F7D4F] bg-white border border-[#E4E4E1] rounded hover:bg-[#F0F9F3] transition-colors cursor-pointer"
+                    >
+                      <Download className="h-3 w-3" />
+                      <span>Export</span>
+                    </button>
 
                     <button
                       onClick={() => onOpenRegister(event.id)}

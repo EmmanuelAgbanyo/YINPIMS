@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { db } from '../../services/db';
-import type { Participant, Registration } from '../../types';
-import { X, Mail, Phone, Building, QrCode, Bed } from 'lucide-react';
-import { ParticipantBadgeModal } from '../badge/ParticipantBadgeModal';
+import type { Participant, Registration, ParticipantBadgeType } from '../../types';
+import { X, Mail, Phone, Building, QrCode, Bed, Tag } from 'lucide-react';
+import { ParticipantBadgeModal, getBadgeTitleTheme } from '../badge/ParticipantBadgeModal';
 import { ConfirmationModal } from '../common/ConfirmationModal';
 
 interface ParticipantDetailDrawerProps {
@@ -29,6 +29,15 @@ export const ParticipantDetailDrawer: React.FC<ParticipantDetailDrawerProps> = (
     db.cancelRegistration(cancellingRegId);
     refreshData();
     setCancellingRegId(null);
+  };
+
+  const handleBadgeTypeChange = (newType: ParticipantBadgeType) => {
+    db.updateData((prev) => ({
+      ...prev,
+      participants: prev.participants.map(p => p.id === participant.id ? { ...p, badgeType: newType } : p),
+      registrations: prev.registrations.map(r => r.participantId === participant.id ? { ...r, badgeType: newType } : r),
+    }));
+    refreshData();
   };
 
   return (
@@ -74,9 +83,35 @@ export const ParticipantDetailDrawer: React.FC<ParticipantDetailDrawerProps> = (
                 </div>
               )}
 
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 pt-1">
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#FAFAF9] text-[#6B6B66] border border-[#E4E4E1]">
                   Gender: {participant.gender}
+                </span>
+              </div>
+            </div>
+
+            {/* Editable Badge Title / Category */}
+            <div className="pt-3 border-t border-[#E4E4E1]/80">
+              <label className="block text-[11px] font-bold text-[#1C1C1A] uppercase tracking-wider mb-1.5">
+                Badge Title / Classification
+              </label>
+              <div className="flex items-center space-x-2">
+                <Tag className="h-4 w-4 text-[#14595A] shrink-0" />
+                <select
+                  value={participant.badgeType || 'Delegate'}
+                  onChange={e => handleBadgeTypeChange(e.target.value as ParticipantBadgeType)}
+                  className="h-8 px-2.5 text-xs rounded-md border border-[#E4E4E1] bg-white text-[#1C1C1A] font-semibold focus:outline-none focus:border-[#14595A] cursor-pointer shadow-2xs"
+                >
+                  <option value="Delegate">Delegate</option>
+                  <option value="Contestant">Contestant</option>
+                  <option value="Speaker">Speaker</option>
+                  <option value="Volunteer">Volunteer</option>
+                  <option value="Staff">Staff</option>
+                </select>
+                <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded text-white ${
+                  getBadgeTitleTheme(participant.badgeType || 'Delegate').bg
+                }`}>
+                  {participant.badgeType || 'Delegate'}
                 </span>
               </div>
             </div>
@@ -97,10 +132,19 @@ export const ParticipantDetailDrawer: React.FC<ParticipantDetailDrawerProps> = (
                   ? data.rooms.find(r => r.id === reg.roomAssignmentId)
                   : null;
 
+                const bType = reg.badgeType || participant.badgeType || 'Delegate';
+
                 return (
                   <div key={reg.id} className="p-3 bg-[#FAFAF9] rounded-lg border border-[#E4E4E1] space-y-2 text-xs">
                     <div className="flex items-start justify-between">
-                      <span className="font-bold text-[#1C1C1A]">{event.name}</span>
+                      <div>
+                        <span className="font-bold text-[#1C1C1A] block">{event.name}</span>
+                        <span className={`inline-block mt-0.5 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded text-white ${
+                          getBadgeTitleTheme(bType).bg
+                        }`}>
+                          {bType}
+                        </span>
+                      </div>
                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
                         reg.status === 'Confirmed'
                           ? 'bg-[#F0F9F3] text-[#2F7D4F]'

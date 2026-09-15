@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { db } from '../../services/db';
-import type { Registration, Participant } from '../../types';
+import type { Registration, Participant, ParticipantBadgeType } from '../../types';
 import { X, AlertCircle, AlertTriangle, CheckCircle, QrCode } from 'lucide-react';
 import { ParticipantBadgeModal } from '../badge/ParticipantBadgeModal';
 
@@ -26,6 +26,7 @@ export const PublicRegistrationModal: React.FC<PublicRegistrationModalProps> = (
   const questions = event ? data.questions.filter(q => q.eventId === event.id).sort((a, b) => a.position - b.position) : [];
 
   // Form State
+  const [badgeType, setBadgeType] = useState<ParticipantBadgeType>('Delegate');
   const [formAnswers, setFormAnswers] = useState<Record<string, string | string[]>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -108,7 +109,7 @@ export const PublicRegistrationModal: React.FC<PublicRegistrationModalProps> = (
 
     const result = db.registerParticipant(
       event.id,
-      { fullName, email, phone, gender },
+      { fullName, email, phone, gender, badgeType },
       formAnswers,
       accommodationRequired
     );
@@ -220,6 +221,23 @@ export const PublicRegistrationModal: React.FC<PublicRegistrationModalProps> = (
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Badge Title / Classification Selector */}
+              <div>
+                <label className="block text-xs font-semibold text-[#1C1C1A] mb-1">Badge Title / Classification</label>
+                <select
+                  value={badgeType}
+                  onChange={e => setBadgeType(e.target.value as ParticipantBadgeType)}
+                  className="w-full h-9 px-3 text-xs rounded-md border border-[#E4E4E1] bg-white text-[#1C1C1A] focus:outline-none focus:border-[#14595A] cursor-pointer font-medium"
+                >
+                  <option value="Delegate">Delegate</option>
+                  <option value="Contestant">Contestant</option>
+                  <option value="Speaker">Speaker</option>
+                  <option value="Volunteer">Volunteer</option>
+                  <option value="Staff">Staff</option>
+                </select>
+                <p className="text-[11px] text-[#6B6B66] mt-1">Classification printed on official event badges & ID cards.</p>
               </div>
 
               {/* Duplicate Notice Banner */}

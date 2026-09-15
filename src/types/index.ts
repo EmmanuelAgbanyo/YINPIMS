@@ -67,6 +67,7 @@ export interface RegistrationQuestion {
   isSystemQuestion?: boolean; // e.g. Accommodation or Gender auto-added
 }
 
+export type ParticipantBadgeType = 'Delegate' | 'Contestant' | 'Speaker' | 'Volunteer' | 'Staff';
 export type RegistrationStatus = 'Confirmed' | 'Waitlisted' | 'Cancelled';
 export type CheckInStatus = 'Not Checked In' | 'Checked In';
 
@@ -75,6 +76,7 @@ export interface Registration {
   eventId: string;
   participantId: string;
   status: RegistrationStatus;
+  badgeType?: ParticipantBadgeType;
   registrationDate: string;
   checkInStatus: CheckInStatus;
   checkInTimestamp?: string;
@@ -93,6 +95,7 @@ export interface Participant {
   email: string;
   phone: string;
   gender: GenderType;
+  badgeType?: ParticipantBadgeType;
   organization?: string;
   jobTitle?: string;
   createdAt: string;

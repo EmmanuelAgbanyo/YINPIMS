@@ -1,9 +1,10 @@
 import React, { useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { toPng } from 'html-to-image';
-import type { Registration, Participant, Event } from '../../types';
-import { X, Download, Printer, Copy, Check, ShieldCheck, Bed } from 'lucide-react';
+import type { Registration, Participant, Event, ParticipantBadgeType } from '../../types';
+import { X, Download, Printer, Copy, Check, ShieldCheck, Bed, Tag } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { db } from '../../services/db';
 
 interface ParticipantBadgeModalProps {
   isOpen: boolean;
@@ -13,6 +14,22 @@ interface ParticipantBadgeModalProps {
   event: Event;
 }
 
+export const getBadgeTitleTheme = (type?: ParticipantBadgeType) => {
+  switch (type) {
+    case 'Speaker':
+      return { bg: 'bg-gradient-to-r from-amber-600 to-amber-700', text: 'text-white', label: 'SPEAKER', border: 'border-amber-500' };
+    case 'Contestant':
+      return { bg: 'bg-gradient-to-r from-purple-600 to-indigo-700', text: 'text-white', label: 'CONTESTANT', border: 'border-purple-500' };
+    case 'Volunteer':
+      return { bg: 'bg-gradient-to-r from-emerald-600 to-teal-700', text: 'text-white', label: 'VOLUNTEER', border: 'border-emerald-500' };
+    case 'Staff':
+      return { bg: 'bg-gradient-to-r from-[#14595A] to-[#0E4243]', text: 'text-white', label: 'STAFF', border: 'border-teal-500' };
+    case 'Delegate':
+    default:
+      return { bg: 'bg-gradient-to-r from-slate-800 to-slate-900', text: 'text-white', label: 'DELEGATE', border: 'border-slate-700' };
+  }
+};
+
 export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
   isOpen,
   onClose,
@@ -20,11 +37,14 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
   participant,
   event,
 }) => {
-  const { data } = useApp();
+  const { data, refreshData } = useApp();
   const badgeRef = useRef<HTMLDivElement>(null);
 
   const [copiedLink, setCopiedLink] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [currentBadgeType, setCurrentBadgeType] = useState<ParticipantBadgeType>(
+    registration.badgeType || participant.badgeType || 'Delegate'
+  );
 
   if (!isOpen) return null;
 
@@ -33,13 +53,30 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
     ? data.rooms.find(r => r.id === registration.roomAssignmentId)
     : null;
 
+  const handleBadgeTypeChange = (newType: ParticipantBadgeType) => {
+    setCurrentBadgeType(newType);
+    // Update locally in DB
+    try {
+      db.updateData((prev) => ({
+        ...prev,
+        registrations: prev.registrations.map(r => r.id === registration.id ? { ...r, badgeType: newType } : r),
+        participants: prev.participants.map(p => p.id === participant.id ? { ...p, badgeType: newType } : p),
+      }));
+      refreshData();
+    } catch (e) {
+      console.warn('Failed to update badge type', e);
+    }
+  };
+
+  const theme = getBadgeTitleTheme(currentBadgeType);
+
   const handleDownloadPNG = async () => {
     if (!badgeRef.current) return;
     setDownloading(true);
     try {
       const dataUrl = await toPng(badgeRef.current, { cacheBust: true, pixelRatio: 2 });
       const link = document.createElement('a');
-      link.download = `Badge_${participant.fullName.replace(/\s+/g, '_')}_${event.name.slice(0, 15)}.png`;
+      link.download = `Badge_${currentBadgeType}_${participant.fullName.replace(/\s+/g, '_')}_${event.name.slice(0, 15)}.png`;
       link.href = dataUrl;
       link.click();
     } catch (err) {
@@ -62,7 +99,7 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-2xs p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto font-body">
       {/* Print stylesheet for single badge printing */}
       <style>{`
         @media print {
@@ -98,18 +135,41 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
         }
       `}</style>
 
-      <div className="bg-[#FAFAF9] border border-[#E4E4E1] rounded-lg shadow-xl w-full max-w-lg flex flex-col my-8">
+      <div className="bg-[#FAFAF9] border border-[#E4E4E1] rounded-2xl shadow-2xl w-full max-w-md flex flex-col my-8 overflow-hidden">
         {/* Header */}
-        <div className="no-print flex items-center justify-between px-6 py-4 border-b border-[#E4E4E1] bg-white rounded-t-lg">
+        <div className="no-print flex items-center justify-between px-6 py-4 border-b border-[#E4E4E1] bg-white">
           <div>
             <h2 className="text-base font-bold text-[#1C1C1A] font-heading">
-              Digital Participant Badge
+              Digital ID Card & Pass Badge
             </h2>
-            <p className="text-xs text-[#6B6B66]">Official event identifier and check-in QR pass.</p>
+            <p className="text-xs text-[#6B6B66]">Official event badge pass with title category.</p>
           </div>
-          <button onClick={onClose} className="h-8 w-8 text-[#6B6B66] hover:bg-[#FAFAF9] rounded flex items-center justify-center cursor-pointer">
+          <button onClick={onClose} className="h-8 w-8 text-[#6B6B66] hover:bg-[#FAFAF9] rounded-lg flex items-center justify-center cursor-pointer">
             <X className="h-4 w-4" />
           </button>
+        </div>
+
+        {/* Badge Title / Role Selector Bar */}
+        <div className="no-print p-4 bg-white border-b border-[#E4E4E1] space-y-2">
+          <label className="block text-xs font-bold text-[#1C1C1A] flex items-center space-x-1">
+            <Tag className="h-3.5 w-3.5 text-[#14595A]" />
+            <span>Select Participant Badge Title:</span>
+          </label>
+          <div className="flex flex-wrap gap-1.5">
+            {(['Delegate', 'Contestant', 'Speaker', 'Volunteer', 'Staff'] as ParticipantBadgeType[]).map(t => (
+              <button
+                key={t}
+                onClick={() => handleBadgeTypeChange(t)}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  currentBadgeType === t
+                    ? `${getBadgeTitleTheme(t).bg} text-white shadow-2xs scale-105`
+                    : 'bg-[#FAFAF9] text-[#6B6B66] hover:text-[#1C1C1A] border border-[#E4E4E1]'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Badge Card Container */}
@@ -117,13 +177,13 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
           {/* Printable Badge Target */}
           <div
             ref={badgeRef}
-            className="printable-badge-container w-full max-w-sm bg-white border border-[#E4E4E1] rounded-xl shadow-md overflow-hidden relative"
+            className="printable-badge-container w-full max-w-sm bg-white border-2 border-[#E4E4E1] rounded-2xl shadow-xl overflow-hidden relative"
           >
             {/* Badge Top Header */}
             <div className="bg-[#14595A] text-white p-4 text-center space-y-1" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-              <div className="flex items-center justify-center space-x-1 text-[10px] font-bold uppercase tracking-wider text-white/80">
+              <div className="flex items-center justify-center space-x-1 text-[10px] font-bold uppercase tracking-widest text-white/80">
                 <ShieldCheck className="h-3.5 w-3.5" />
-                <span>Verified Delegate Pass</span>
+                <span>Verified Official Pass</span>
               </div>
               <h3 className="font-heading font-bold text-sm leading-tight text-white px-2">
                 {event.name}
@@ -133,27 +193,35 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
               </p>
             </div>
 
+            {/* Prominent Badge Title / Role Banner */}
+            <div 
+              className={`w-full py-2 text-center text-xs font-extrabold font-heading tracking-widest uppercase shadow-xs ${theme.bg} ${theme.text}`}
+              style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}
+            >
+              ★ {theme.label} ★
+            </div>
+
             {/* Badge Body */}
             <div className="p-6 text-center space-y-4 bg-white">
-              {/* Participant Name & Title */}
+              {/* Participant Name & Organization */}
               <div>
                 <h2 className="font-heading font-bold text-xl text-[#1C1C1A] tracking-tight">
                   {participant.fullName}
                 </h2>
                 {participant.organization && (
-                  <p className="text-xs font-semibold text-[#14595A] mt-0.5">
+                  <p className="text-xs font-semibold text-[#14595A] mt-1">
                     {participant.organization}
                   </p>
                 )}
                 {participant.jobTitle && (
-                  <p className="text-[11px] text-[#6B6B66]">
+                  <p className="text-[11px] text-[#6B6B66] mt-0.5">
                     {participant.jobTitle}
                   </p>
                 )}
               </div>
 
               {/* QR Code Centerpiece */}
-              <div className="bg-[#FAFAF9] p-3 rounded-lg border border-[#E4E4E1] inline-block shadow-2xs" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+              <div className="bg-[#FAFAF9] p-3 rounded-xl border border-[#E4E4E1] inline-block shadow-2xs" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
                 <QRCodeSVG
                   value={registration.qrIdentifier}
                   size={140}
@@ -172,7 +240,7 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
                 </div>
 
                 {room && (
-                  <div className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded bg-[#EBF4F4] text-[#14595A] text-xs font-bold mt-2" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                  <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-[#EBF4F4] text-[#14595A] text-xs font-bold mt-2" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
                     <Bed className="h-3.5 w-3.5" />
                     <span>Assigned Room: {room.roomNumber}</span>
                   </div>
@@ -181,11 +249,11 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
             </div>
 
             {/* Badge Footer */}
-            <div className="bg-[#FAFAF9] px-4 py-2 border-t border-[#E4E4E1] flex items-center justify-between text-[10px] text-[#6B6B66]" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-              <span>PIMS Digital ID System</span>
+            <div className="bg-[#FAFAF9] px-4 py-2.5 border-t border-[#E4E4E1] flex items-center justify-between text-[10px] text-[#6B6B66]" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+              <span className="font-semibold">PIMS ID Pass System</span>
               <span className="font-semibold text-[#2F7D4F] flex items-center space-x-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#2F7D4F]" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }} />
-                <span>CONFIRMED</span>
+                <span className="h-2 w-2 rounded-full bg-[#2F7D4F]" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }} />
+                <span>ACTIVE</span>
               </span>
             </div>
           </div>
@@ -195,7 +263,7 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
             <button
               onClick={handleDownloadPNG}
               disabled={downloading}
-              className="flex items-center space-x-1.5 h-9 px-4 bg-[#14595A] text-white text-xs font-medium rounded-md hover:bg-[#0E4243] transition-colors cursor-pointer shadow-2xs"
+              className="flex items-center space-x-1.5 h-9 px-4 bg-[#14595A] text-white text-xs font-medium rounded-xl hover:bg-[#0E4243] transition-colors cursor-pointer shadow-2xs"
             >
               <Download className="h-4 w-4" />
               <span>{downloading ? 'Exporting...' : 'Download PNG Badge'}</span>
@@ -203,7 +271,7 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
 
             <button
               onClick={handlePrint}
-              className="flex items-center space-x-1.5 h-9 px-3.5 bg-white border border-[#E4E4E1] text-[#1C1C1A] text-xs font-medium rounded-md hover:bg-[#FAFAF9] transition-colors cursor-pointer"
+              className="flex items-center space-x-1.5 h-9 px-3.5 bg-white border border-[#E4E4E1] text-[#1C1C1A] text-xs font-medium rounded-xl hover:bg-[#FAFAF9] transition-colors cursor-pointer"
             >
               <Printer className="h-4 w-4 text-[#6B6B66]" />
               <span>Print Badge</span>
@@ -211,7 +279,7 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
 
             <button
               onClick={handleCopyLink}
-              className="flex items-center space-x-1.5 h-9 px-3.5 bg-white border border-[#E4E4E1] text-[#1C1C1A] text-xs font-medium rounded-md hover:bg-[#FAFAF9] transition-colors cursor-pointer"
+              className="flex items-center space-x-1.5 h-9 px-3.5 bg-white border border-[#E4E4E1] text-[#1C1C1A] text-xs font-medium rounded-xl hover:bg-[#FAFAF9] transition-colors cursor-pointer"
             >
               {copiedLink ? <Check className="h-4 w-4 text-[#2F7D4F]" /> : <Copy className="h-4 w-4 text-[#6B6B66]" />}
               <span>{copiedLink ? 'Link Copied!' : 'Share Pass Link'}</span>
@@ -220,10 +288,10 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="px-6 py-3 border-t border-[#E4E4E1] bg-white rounded-b-lg flex justify-end">
+        <div className="px-6 py-3 border-t border-[#E4E4E1] bg-white flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 h-8 bg-white border border-[#E4E4E1] text-xs font-medium text-[#1C1C1A] rounded-md hover:bg-[#FAFAF9] cursor-pointer"
+            className="px-4 h-8 bg-white border border-[#E4E4E1] text-xs font-medium text-[#1C1C1A] rounded-xl hover:bg-[#FAFAF9] cursor-pointer"
           >
             Close Badge
           </button>

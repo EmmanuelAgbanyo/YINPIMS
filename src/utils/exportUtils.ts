@@ -1,0 +1,184 @@
+import type { DatabaseSchema } from '../services/db';
+import type { Participant } from '../types';
+
+export interface ParticipantExportRow {
+  participantId: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  gender: string;
+  organization: string;
+  jobTitle: string;
+  eventId: string;
+  eventName: string;
+  registrationStatus: string;
+  checkInStatus: string;
+  checkInTimestamp: string;
+  accommodationRequired: string;
+  assignedRoomNumber: string;
+  qrIdentifier: string;
+}
+
+export const generateParticipantExportData = (
+  data: DatabaseSchema,
+  targetEventId: string = 'all',
+  filteredParticipants?: Participant[]
+): ParticipantExportRow[] => {
+  const participantsToExport = filteredParticipants || data.participants;
+  const rows: ParticipantExportRow[] = [];
+
+  participantsToExport.forEach(p => {
+    const pRegs = data.registrations.filter(r => r.participantId === p.id);
+    
+    // Filter registrations by event if targetEventId is not 'all'
+    const matchingRegs = targetEventId === 'all'
+      ? pRegs
+      : pRegs.filter(r => r.eventId === targetEventId);
+
+    if (matchingRegs.length > 0) {
+      matchingRegs.forEach(reg => {
+        const event = data.events.find(e => e.id === reg.eventId);
+        const room = data.rooms.find(rm => rm.id === reg.roomAssignmentId);
+
+        rows.push({
+          participantId: p.id,
+          fullName: p.fullName,
+          email: p.email,
+          phone: p.phone || '',
+          gender: p.gender || '',
+          organization: p.organization || '',
+          jobTitle: p.jobTitle || '',
+          eventId: reg.eventId,
+          eventName: event?.name || reg.eventId,
+          registrationStatus: reg.status,
+          checkInStatus: reg.checkInStatus,
+          checkInTimestamp: reg.checkInTimestamp ? new Date(reg.checkInTimestamp).toLocaleString() : '',
+          accommodationRequired: reg.accommodationRequired ? 'Yes' : 'No',
+          assignedRoomNumber: room?.roomNumber || '',
+          qrIdentifier: reg.qrIdentifier || '',
+        });
+      });
+    } else if (targetEventId === 'all') {
+      // Participant has no active registration yet
+      rows.push({
+        participantId: p.id,
+        fullName: p.fullName,
+        email: p.email,
+        phone: p.phone || '',
+        gender: p.gender || '',
+        organization: p.organization || '',
+        jobTitle: p.jobTitle || '',
+        eventId: 'N/A',
+        eventName: 'Unregistered',
+        registrationStatus: 'None',
+        checkInStatus: 'N/A',
+        checkInTimestamp: '',
+        accommodationRequired: 'No',
+        assignedRoomNumber: '',
+        qrIdentifier: '',
+      });
+    }
+  });
+
+  return rows;
+};
+
+export const exportParticipantsCSV = (
+  data: DatabaseSchema,
+  targetEventId: string = 'all',
+  filteredParticipants?: Participant[],
+  customFilename?: string
+) => {
+  const rows = generateParticipantExportData(data, targetEventId, filteredParticipants);
+
+  if (rows.length === 0) {
+    alert('No participants found to export.');
+    return;
+  }
+
+  const headers = [
+    'Participant ID',
+    'Full Name',
+    'Email Address',
+    'Phone Number',
+    'Gender',
+    'Organization',
+    'Job Title',
+    'Event ID',
+    'Event Name',
+    'Registration Status',
+    'Check-In Status',
+    'Check-In Timestamp',
+    'Accommodation Required',
+    'Room Number',
+    'QR Code Pass ID'
+  ];
+
+  const csvRows: string[] = [];
+  csvRows.push(headers.join(','));
+
+  rows.forEach(row => {
+    const values = [
+      `"${row.participantId.replace(/"/g, '""')}"`,
+      `"${row.fullName.replace(/"/g, '""')}"`,
+      `"${row.email.replace(/"/g, '""')}"`,
+      `"${row.phone.replace(/"/g, '""')}"`,
+      `"${row.gender.replace(/"/g, '""')}"`,
+      `"${row.organization.replace(/"/g, '""')}"`,
+      `"${row.jobTitle.replace(/"/g, '""')}"`,
+      `"${row.eventId.replace(/"/g, '""')}"`,
+      `"${row.eventName.replace(/"/g, '""')}"`,
+      `"${row.registrationStatus.replace(/"/g, '""')}"`,
+      `"${row.checkInStatus.replace(/"/g, '""')}"`,
+      `"${row.checkInTimestamp.replace(/"/g, '""')}"`,
+      `"${row.accommodationRequired.replace(/"/g, '""')}"`,
+      `"${row.assignedRoomNumber.replace(/"/g, '""')}"`,
+      `"${row.qrIdentifier.replace(/"/g, '""')}"`
+    ];
+    csvRows.push(values.join(','));
+  });
+
+  const csvString = csvRows.join('\n');
+  const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  
+  const eventObj = targetEventId !== 'all' ? data.events.find(e => e.id === targetEventId) : null;
+  const eventSanitized = eventObj ? eventObj.name.replace(/[^a-zA-Z0-9]/g, '_') : 'All_Events';
+  const fileName = customFilename || `PIMS_Participants_${eventSanitized}_${new Date().toISOString().split('T')[0]}.csv`;
+
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', fileName);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+export const exportParticipantsJSON = (
+  data: DatabaseSchema,
+  targetEventId: string = 'all',
+  filteredParticipants?: Participant[],
+  customFilename?: string
+) => {
+  const rows = generateParticipantExportData(data, targetEventId, filteredParticipants);
+
+  if (rows.length === 0) {
+    alert('No participants found to export.');
+    return;
+  }
+
+  const jsonString = JSON.stringify(rows, null, 2);
+  const blob = new Blob([jsonString], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+
+  const eventObj = targetEventId !== 'all' ? data.events.find(e => e.id === targetEventId) : null;
+  const eventSanitized = eventObj ? eventObj.name.replace(/[^a-zA-Z0-9]/g, '_') : 'All_Events';
+  const fileName = customFilename || `PIMS_Participants_${eventSanitized}_${new Date().toISOString().split('T')[0]}.json`;
+
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', fileName);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};

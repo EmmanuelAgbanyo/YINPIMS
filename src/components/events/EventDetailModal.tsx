@@ -18,6 +18,7 @@ import {
   ArrowRight,
   ShieldCheck,
   Printer,
+  Download,
 } from 'lucide-react';
 import { FormBuilder } from '../builder/FormBuilder';
 import { AccommodationView } from '../accommodation/AccommodationView';
@@ -26,6 +27,7 @@ import { CheckInView } from '../checkin/CheckInView';
 import { CommunicationsView } from '../communications/CommunicationsView';
 import { WaitlistManagerModal } from '../waitlist/WaitlistManagerModal';
 import { BatchBadgePrintModal } from '../badge/BatchBadgePrintModal';
+import { exportParticipantsCSV } from '../../utils/exportUtils';
 
 interface EventDetailModalProps {
   isOpen: boolean;
@@ -133,6 +135,15 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
 
           {/* Quick Header Controls */}
           <div className="flex items-center space-x-2 shrink-0 self-end md:self-auto">
+            <button
+              onClick={() => exportParticipantsCSV(data, event.id)}
+              title="Download full participant directory CSV for this event"
+              className="h-8 px-2.5 bg-white border border-[#E4E4E1] text-[#2F7D4F] text-xs font-semibold rounded-md hover:bg-[#F0F9F3] transition-colors cursor-pointer flex items-center space-x-1"
+            >
+              <Download className="h-3.5 w-3.5 text-[#2F7D4F]" />
+              <span>Export CSV</span>
+            </button>
+
             <button
               onClick={() => setIsBatchPrintOpen(true)}
               title="Print all delegate badges formatted 4 per A4 page"
