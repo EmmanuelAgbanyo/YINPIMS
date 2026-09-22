@@ -10,6 +10,14 @@ import type {
   ParticipantBadgeType,
 } from '../types';
 import { syncService } from './sync';
+import { 
+  syncEventToFirestore, 
+  deleteEventFromFirestore, 
+  syncParticipantToFirestore, 
+  syncRegistrationToFirestore, 
+  syncRoomToFirestore, 
+  syncQuestionToFirestore 
+} from './firebase';
 
 const STORAGE_KEY = 'PIMS_DATA_V2';
 
@@ -147,6 +155,117 @@ class StorageService {
     return this.data;
   }
 
+  // --- CLOUD FIRESTORE MERGE HELPERS ---
+  public mergeEventsFromCloud(cloudEvents: Event[]) {
+    if (!cloudEvents || cloudEvents.length === 0) return;
+    let changed = false;
+    const current = [...this.data.events];
+    for (const ce of cloudEvents) {
+      const idx = current.findIndex(e => e.id === ce.id);
+      if (idx === -1) {
+        current.unshift(ce);
+        changed = true;
+      } else {
+        if (JSON.stringify(current[idx]) !== JSON.stringify(ce)) {
+          current[idx] = { ...current[idx], ...ce };
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      this.saveToStorage({ ...this.data, events: current }, true);
+      window.dispatchEvent(new CustomEvent('PIMS_LOCAL_DATA_REFRESH'));
+    }
+  }
+
+  public mergeParticipantsFromCloud(cloudParticipants: Participant[]) {
+    if (!cloudParticipants || cloudParticipants.length === 0) return;
+    let changed = false;
+    const current = [...this.data.participants];
+    for (const cp of cloudParticipants) {
+      const idx = current.findIndex(p => p.id === cp.id);
+      if (idx === -1) {
+        current.unshift(cp);
+        changed = true;
+      } else {
+        if (JSON.stringify(current[idx]) !== JSON.stringify(cp)) {
+          current[idx] = { ...current[idx], ...cp };
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      this.saveToStorage({ ...this.data, participants: current }, true);
+      window.dispatchEvent(new CustomEvent('PIMS_LOCAL_DATA_REFRESH'));
+    }
+  }
+
+  public mergeRegistrationsFromCloud(cloudRegs: Registration[]) {
+    if (!cloudRegs || cloudRegs.length === 0) return;
+    let changed = false;
+    const current = [...this.data.registrations];
+    for (const cr of cloudRegs) {
+      const idx = current.findIndex(r => r.id === cr.id);
+      if (idx === -1) {
+        current.unshift(cr);
+        changed = true;
+      } else {
+        if (JSON.stringify(current[idx]) !== JSON.stringify(cr)) {
+          current[idx] = { ...current[idx], ...cr };
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      this.saveToStorage({ ...this.data, registrations: current }, true);
+      window.dispatchEvent(new CustomEvent('PIMS_LOCAL_DATA_REFRESH'));
+    }
+  }
+
+  public mergeRoomsFromCloud(cloudRooms: AccommodationRoom[]) {
+    if (!cloudRooms || cloudRooms.length === 0) return;
+    let changed = false;
+    const current = [...this.data.rooms];
+    for (const cr of cloudRooms) {
+      const idx = current.findIndex(r => r.id === cr.id);
+      if (idx === -1) {
+        current.unshift(cr);
+        changed = true;
+      } else {
+        if (JSON.stringify(current[idx]) !== JSON.stringify(cr)) {
+          current[idx] = { ...current[idx], ...cr };
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      this.saveToStorage({ ...this.data, rooms: current }, true);
+      window.dispatchEvent(new CustomEvent('PIMS_LOCAL_DATA_REFRESH'));
+    }
+  }
+
+  public mergeQuestionsFromCloud(cloudQuestions: RegistrationQuestion[]) {
+    if (!cloudQuestions || cloudQuestions.length === 0) return;
+    let changed = false;
+    const current = [...this.data.questions];
+    for (const cq of cloudQuestions) {
+      const idx = current.findIndex(q => q.id === cq.id);
+      if (idx === -1) {
+        current.push(cq);
+        changed = true;
+      } else {
+        if (JSON.stringify(current[idx]) !== JSON.stringify(cq)) {
+          current[idx] = { ...current[idx], ...cq };
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      this.saveToStorage({ ...this.data, questions: current }, true);
+      window.dispatchEvent(new CustomEvent('PIMS_LOCAL_DATA_REFRESH'));
+    }
+  }
+
   // --- USERS & TEAM ---
   public getUsers(): User[] {
     return this.data.users;
@@ -282,6 +401,7 @@ class StorageService {
     }
 
     this.saveToStorage({ ...this.data, events });
+    syncEventToFirestore(newEvent);
     return newEvent;
   }
 
@@ -292,6 +412,7 @@ class StorageService {
     const rooms = this.data.rooms.filter(rm => rm.eventId !== eventId);
 
     this.saveToStorage({ ...this.data, events, registrations, questions, rooms });
+    deleteEventFromFirestore(eventId);
   }
 
   // --- QUESTIONS ---
@@ -304,6 +425,7 @@ class StorageService {
   public saveQuestionsForEvent(eventId: string, questions: RegistrationQuestion[]): void {
     const otherQuestions = this.data.questions.filter(q => q.eventId !== eventId);
     this.saveToStorage({ ...this.data, questions: [...otherQuestions, ...questions] });
+    questions.forEach(q => syncQuestionToFirestore(q));
   }
 
   public ensureDefaultQuestions(eventId: string, accommodationEnabled: boolean): void {
@@ -506,6 +628,8 @@ class StorageService {
     });
 
     this.saveToStorage(this.data);
+    syncParticipantToFirestore(participant);
+    syncRegistrationToFirestore(newRegistration);
 
     return {
       registration: newRegistration,
@@ -541,6 +665,7 @@ class StorageService {
 
     this.data.registrations[regIndex] = updatedReg;
     this.saveToStorage(this.data);
+    syncRegistrationToFirestore(updatedReg);
 
     return {
       success: true,
@@ -648,6 +773,7 @@ class StorageService {
     }
 
     this.saveToStorage({ ...this.data, rooms });
+    syncRoomToFirestore(newRoom);
     return newRoom;
   }
 
@@ -663,6 +789,7 @@ class StorageService {
 
     const rooms = [...this.data.rooms, ...created];
     this.saveToStorage({ ...this.data, rooms });
+    created.forEach(rm => syncRoomToFirestore(rm));
     return created;
   }
 

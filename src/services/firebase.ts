@@ -20,9 +20,10 @@ import {
   doc, 
   setDoc, 
   getDoc, 
-  onSnapshot,
-  collection,
-  getDocs
+  onSnapshot, 
+  collection, 
+  getDocs,
+  deleteDoc
 } from "firebase/firestore";
 import { getAnalytics, isSupported } from "firebase/analytics";
 
@@ -223,6 +224,185 @@ export const fetchAllUsersFromFirestore = async (): Promise<any[]> => {
     });
   } catch (err) {
     console.warn('fetchAllUsersFromFirestore note:', err);
+    return [];
+  }
+};
+
+// --- EVENT FIRESTORE SYNC ---
+export const syncEventToFirestore = async (event: any) => {
+  try {
+    const docRef = doc(firestore, 'events', event.id);
+    await setDoc(docRef, {
+      ...event,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+  } catch (err) {
+    console.warn('syncEventToFirestore note:', err);
+  }
+};
+
+export const deleteEventFromFirestore = async (eventId: string) => {
+  try {
+    const docRef = doc(firestore, 'events', eventId);
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.warn('deleteEventFromFirestore note:', err);
+  }
+};
+
+export const subscribeAllEvents = (callback: (events: any[]) => void) => {
+  const ref = collection(firestore, 'events');
+  return onSnapshot(ref, (snapshot) => {
+    const list = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
+    callback(list);
+  }, (err) => {
+    console.warn('subscribeAllEvents note:', err);
+  });
+};
+
+export const fetchAllEventsFromFirestore = async (): Promise<any[]> => {
+  try {
+    const ref = collection(firestore, 'events');
+    const snap = await getDocs(ref);
+    return snap.docs.map(d => ({ ...d.data(), id: d.id }));
+  } catch (err) {
+    console.warn('fetchAllEventsFromFirestore note:', err);
+    return [];
+  }
+};
+
+// --- PARTICIPANT FIRESTORE SYNC ---
+export const syncParticipantToFirestore = async (participant: any) => {
+  try {
+    const docRef = doc(firestore, 'participants', participant.id);
+    await setDoc(docRef, {
+      ...participant,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+  } catch (err) {
+    console.warn('syncParticipantToFirestore note:', err);
+  }
+};
+
+export const subscribeAllParticipants = (callback: (participants: any[]) => void) => {
+  const ref = collection(firestore, 'participants');
+  return onSnapshot(ref, (snapshot) => {
+    const list = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
+    callback(list);
+  }, (err) => {
+    console.warn('subscribeAllParticipants note:', err);
+  });
+};
+
+export const fetchAllParticipantsFromFirestore = async (): Promise<any[]> => {
+  try {
+    const ref = collection(firestore, 'participants');
+    const snap = await getDocs(ref);
+    return snap.docs.map(d => ({ ...d.data(), id: d.id }));
+  } catch (err) {
+    console.warn('fetchAllParticipantsFromFirestore note:', err);
+    return [];
+  }
+};
+
+// --- REGISTRATION FIRESTORE SYNC ---
+export const syncRegistrationToFirestore = async (registration: any) => {
+  try {
+    const docRef = doc(firestore, 'registrations', registration.id);
+    await setDoc(docRef, {
+      ...registration,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+  } catch (err) {
+    console.warn('syncRegistrationToFirestore note:', err);
+  }
+};
+
+export const subscribeAllRegistrations = (callback: (regs: any[]) => void) => {
+  const ref = collection(firestore, 'registrations');
+  return onSnapshot(ref, (snapshot) => {
+    const list = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
+    callback(list);
+  }, (err) => {
+    console.warn('subscribeAllRegistrations note:', err);
+  });
+};
+
+export const fetchAllRegistrationsFromFirestore = async (): Promise<any[]> => {
+  try {
+    const ref = collection(firestore, 'registrations');
+    const snap = await getDocs(ref);
+    return snap.docs.map(d => ({ ...d.data(), id: d.id }));
+  } catch (err) {
+    console.warn('fetchAllRegistrationsFromFirestore note:', err);
+    return [];
+  }
+};
+
+// --- ROOM FIRESTORE SYNC ---
+export const syncRoomToFirestore = async (room: any) => {
+  try {
+    const docRef = doc(firestore, 'rooms', room.id);
+    await setDoc(docRef, {
+      ...room,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+  } catch (err) {
+    console.warn('syncRoomToFirestore note:', err);
+  }
+};
+
+export const subscribeAllRooms = (callback: (rooms: any[]) => void) => {
+  const ref = collection(firestore, 'rooms');
+  return onSnapshot(ref, (snapshot) => {
+    const list = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
+    callback(list);
+  }, (err) => {
+    console.warn('subscribeAllRooms note:', err);
+  });
+};
+
+export const fetchAllRoomsFromFirestore = async (): Promise<any[]> => {
+  try {
+    const ref = collection(firestore, 'rooms');
+    const snap = await getDocs(ref);
+    return snap.docs.map(d => ({ ...d.data(), id: d.id }));
+  } catch (err) {
+    console.warn('fetchAllRoomsFromFirestore note:', err);
+    return [];
+  }
+};
+
+// --- QUESTION FIRESTORE SYNC ---
+export const syncQuestionToFirestore = async (question: any) => {
+  try {
+    const docRef = doc(firestore, 'questions', question.id);
+    await setDoc(docRef, {
+      ...question,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+  } catch (err) {
+    console.warn('syncQuestionToFirestore note:', err);
+  }
+};
+
+export const subscribeAllQuestions = (callback: (questions: any[]) => void) => {
+  const ref = collection(firestore, 'questions');
+  return onSnapshot(ref, (snapshot) => {
+    const list = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
+    callback(list);
+  }, (err) => {
+    console.warn('subscribeAllQuestions note:', err);
+  });
+};
+
+export const fetchAllQuestionsFromFirestore = async (): Promise<any[]> => {
+  try {
+    const ref = collection(firestore, 'questions');
+    const snap = await getDocs(ref);
+    return snap.docs.map(d => ({ ...d.data(), id: d.id }));
+  } catch (err) {
+    console.warn('fetchAllQuestionsFromFirestore note:', err);
     return [];
   }
 };

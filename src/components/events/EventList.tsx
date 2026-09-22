@@ -33,7 +33,7 @@ export const EventList: React.FC<EventListProps> = ({
   onOpenFormBuilder,
   onOpenRegister,
 }) => {
-  const { data, refreshData, hasPermission } = useApp();
+  const { data, refreshData, hasPermission, effectiveUser } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -45,8 +45,13 @@ export const EventList: React.FC<EventListProps> = ({
   // Delete Confirmation State
   const [deletingEvent, setDeletingEvent] = useState<Event | null>(null);
 
+  // Scoped Event Access: Admins or users with '*' see all events; others see assigned events
+  const userAssigned = effectiveUser?.assignedEvents || ['*'];
+  const isAllEvents = userAssigned.includes('*') || effectiveUser?.role === 'ADMIN';
+  const authorizedEvents = data.events.filter(e => isAllEvents || userAssigned.includes(e.id));
+
   // Filtering Logic
-  const filteredEvents = data.events.filter(event => {
+  const filteredEvents = authorizedEvents.filter(event => {
     const matchesSearch =
       event.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       event.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -323,9 +328,19 @@ export const EventList: React.FC<EventListProps> = ({
           <div className="h-12 w-12 rounded-full bg-[#FAFAF9] border border-[#E4E4E1] text-[#6B6B66] flex items-center justify-center mx-auto">
             <Calendar className="h-6 w-6" />
           </div>
-          <h3 className="text-base font-bold text-[#1C1C1A] font-heading">No Events Found</h3>
+          <h3 className="text-base font-bold text-[#1C1C1A] font-heading">
+            {data.events.length === 0 
+              ? 'No Events Created Yet' 
+              : authorizedEvents.length === 0 
+                ? 'No Assigned Events' 
+                : 'No Matching Events'}
+          </h3>
           <p className="text-xs text-[#6B6B66]">
-            No events match your current search query or filter criteria. Create your first event to start managing participants.
+            {data.events.length === 0
+              ? 'There are currently no events registered in the system. As an administrator, you can create a new event now.'
+              : authorizedEvents.length === 0
+                ? 'You are not assigned to any events yet. Please ask the Super Administrator (policyp28@gmail.com) to assign event permissions to your profile.'
+                : 'No events match your current search query or filter criteria.'}
           </p>
           {hasPermission('create_event') && (
             <button

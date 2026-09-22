@@ -11,7 +11,21 @@ import {
   updateCurrentUserPassword,
   subscribeAllUsers,
   fetchAllUsersFromFirestore,
-  syncFirestoreDoc
+  syncFirestoreDoc,
+  subscribeAllEvents,
+  fetchAllEventsFromFirestore,
+  syncEventToFirestore,
+  subscribeAllParticipants,
+  fetchAllParticipantsFromFirestore,
+  syncParticipantToFirestore,
+  subscribeAllRegistrations,
+  fetchAllRegistrationsFromFirestore,
+  syncRegistrationToFirestore,
+  subscribeAllRooms,
+  fetchAllRoomsFromFirestore,
+  syncRoomToFirestore,
+  subscribeAllQuestions,
+  fetchAllQuestionsFromFirestore
 } from '../services/firebase';
 import type { User as FirebaseUser } from 'firebase/auth';
 
@@ -244,6 +258,100 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
 
+    // 1. Cloud Firestore Real-Time Event Sync
+    const unsubscribeEvents = subscribeAllEvents((cloudEvents) => {
+      if (cloudEvents && cloudEvents.length > 0) {
+        db.mergeEventsFromCloud(cloudEvents);
+        refreshData();
+      }
+    });
+
+    fetchAllEventsFromFirestore().then((cloudEvents) => {
+      if (cloudEvents && cloudEvents.length > 0) {
+        db.mergeEventsFromCloud(cloudEvents);
+        refreshData();
+      } else {
+        // Hydrate Firestore from local database if Firestore is currently empty
+        const localEvents = db.getEvents();
+        if (localEvents.length > 0) {
+          localEvents.forEach(evt => syncEventToFirestore(evt));
+        }
+      }
+    });
+
+    // 2. Cloud Firestore Real-Time Participants & Registrations Sync
+    const unsubscribeParticipants = subscribeAllParticipants((cloudParticipants) => {
+      if (cloudParticipants && cloudParticipants.length > 0) {
+        db.mergeParticipantsFromCloud(cloudParticipants);
+        refreshData();
+      }
+    });
+
+    fetchAllParticipantsFromFirestore().then((cloudParticipants) => {
+      if (cloudParticipants && cloudParticipants.length > 0) {
+        db.mergeParticipantsFromCloud(cloudParticipants);
+        refreshData();
+      } else {
+        const localParts = db.getParticipants();
+        if (localParts.length > 0) {
+          localParts.forEach(p => syncParticipantToFirestore(p));
+        }
+      }
+    });
+
+    const unsubscribeRegistrations = subscribeAllRegistrations((cloudRegs) => {
+      if (cloudRegs && cloudRegs.length > 0) {
+        db.mergeRegistrationsFromCloud(cloudRegs);
+        refreshData();
+      }
+    });
+
+    fetchAllRegistrationsFromFirestore().then((cloudRegs) => {
+      if (cloudRegs && cloudRegs.length > 0) {
+        db.mergeRegistrationsFromCloud(cloudRegs);
+        refreshData();
+      } else {
+        const localRegs = db.getRegistrations();
+        if (localRegs.length > 0) {
+          localRegs.forEach(r => syncRegistrationToFirestore(r));
+        }
+      }
+    });
+
+    // 3. Cloud Firestore Real-Time Rooms & Questions Sync
+    const unsubscribeRooms = subscribeAllRooms((cloudRooms) => {
+      if (cloudRooms && cloudRooms.length > 0) {
+        db.mergeRoomsFromCloud(cloudRooms);
+        refreshData();
+      }
+    });
+
+    fetchAllRoomsFromFirestore().then((cloudRooms) => {
+      if (cloudRooms && cloudRooms.length > 0) {
+        db.mergeRoomsFromCloud(cloudRooms);
+        refreshData();
+      } else {
+        const localRooms = db.getData().rooms;
+        if (localRooms && localRooms.length > 0) {
+          localRooms.forEach(rm => syncRoomToFirestore(rm));
+        }
+      }
+    });
+
+    const unsubscribeQuestions = subscribeAllQuestions((cloudQuestions) => {
+      if (cloudQuestions && cloudQuestions.length > 0) {
+        db.mergeQuestionsFromCloud(cloudQuestions);
+        refreshData();
+      }
+    });
+
+    fetchAllQuestionsFromFirestore().then((cloudQuestions) => {
+      if (cloudQuestions && cloudQuestions.length > 0) {
+        db.mergeQuestionsFromCloud(cloudQuestions);
+        refreshData();
+      }
+    });
+
     // Listen for sync status changes
     const unsubscribeStatus = syncService.subscribeStatus((newStatus) => {
       setSyncStatus(newStatus);
@@ -259,6 +367,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => {
       unsubscribeAuth();
       if (unsubscribeUsers) unsubscribeUsers();
+      if (unsubscribeEvents) unsubscribeEvents();
+      if (unsubscribeParticipants) unsubscribeParticipants();
+      if (unsubscribeRegistrations) unsubscribeRegistrations();
+      if (unsubscribeRooms) unsubscribeRooms();
+      if (unsubscribeQuestions) unsubscribeQuestions();
       unsubscribeStatus();
       window.removeEventListener('PIMS_LOCAL_DATA_REFRESH', handleDataRefresh);
     };
