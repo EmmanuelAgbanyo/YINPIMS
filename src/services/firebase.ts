@@ -1,4 +1,4 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, deleteApp } from "firebase/app";
 import { 
   getAuth, 
   createUserWithEmailAndPassword, 
@@ -182,4 +182,65 @@ export const getStaffAccountFromFirestore = async (email: string) => {
     console.warn('Failed to fetch staff account from Firestore:', err);
     return null;
   }
+};
+
+/**
+ * Universal Cloud Staff Registration via Secondary Firebase Auth App
+ * Creates the user account directly in Firebase Authentication so the staff member can
+ * log in on any device (phone, laptop, desktop) anywhere in the world without session interference!
+ */
+export const registerStaffInFirebaseAuth = async (
+  email: string, 
+  provisionalPass: string, 
+  displayName?: string
+): Promise<{ success: boolean; isExisting?: boolean; error?: string }> => {
+  const tempAppName = `staff-reg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  let tempApp = null;
+  try {
+    tempApp = initializeApp(firebaseConfig, tempAppName);
+    const tempAuth = getAuth(tempApp);
+    const cred = await createUserWithEmailAndPassword(tempAuth, email.trim().toLowerCase(), provisionalPass.trim());
+    if (displayName && cred.user) {
+      try {
+        await updateProfile(cred.user, { displayName });
+      } catch {
+        // non-critical
+      }
+    }
+    return { success: true };
+  } catch (err: any) {
+    if (err.code === 'auth/email-already-in-use') {
+      return { success: true, isExisting: true };
+    }
+    console.warn('Firebase Auth staff registration note:', err);
+    return { success: false, error: err.message || 'Registration failed' };
+  } finally {
+    if (tempApp) {
+      try {
+        await deleteApp(tempApp);
+      } catch {
+        // non-critical
+      }
+    }
+  }
+};
+
+export const encodeStaffProfile = (name: string, role: string, assignedEvents: string[] = ['*']): string => {
+  return `${name.replace(/[#|]/g, ' ')}|${role}|${assignedEvents.join(',')}`;
+};
+
+export const decodeStaffProfile = (displayName?: string | null): { name: string; role: string; assignedEvents: string[] } => {
+  if (!displayName || !displayName.includes('|')) {
+    return {
+      name: displayName || 'Staff Member',
+      role: 'CHECKIN_STAFF',
+      assignedEvents: ['*'],
+    };
+  }
+  const parts = displayName.split('|');
+  return {
+    name: parts[0] || 'Staff Member',
+    role: parts[1] || 'CHECKIN_STAFF',
+    assignedEvents: parts[2] ? parts[2].split(',') : ['*'],
+  };
 };

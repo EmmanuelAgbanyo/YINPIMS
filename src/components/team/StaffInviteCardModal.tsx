@@ -8,9 +8,21 @@ import {
   ShieldCheck, 
   Calendar, 
   Send, 
-  CheckCircle2 
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react';
 import type { User, Event } from '../../types';
+import { 
+  dispatchViaMailto, 
+  dispatchFirebasePasswordSetup, 
+  copyInviteToClipboard,
+  generateStaffInviteText,
+  resolveEventNames
+} from '../../services/emailService';
 
 interface StaffInviteCardModalProps {
   isOpen: boolean;
@@ -28,41 +40,45 @@ export const StaffInviteCardModal: React.FC<StaffInviteCardModalProps> = ({
   provisionalPassword,
 }) => {
   const [copied, setCopied] = useState(false);
-  const [simulatedSent, setSimulatedSent] = useState(false);
+  const [isSendingFirebaseEmail, setIsSendingFirebaseEmail] = useState(false);
+  const [firebaseEmailResult, setFirebaseEmailResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [mailtoSuccess, setMailtoSuccess] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   if (!isOpen) return null;
 
   const passwordToDisplay = provisionalPassword || user.provisionalPassword || '(Default / Pre-existing)';
+  const assignedEventNames = resolveEventNames(user.assignedEvents, events);
+  const { subject, body } = generateStaffInviteText(user, passwordToDisplay, events);
 
-  // Resolve assigned event names
-  const assignedEventNames = user.assignedEvents?.includes('*') || !user.assignedEvents
-    ? 'All Events (Global Scope)'
-    : user.assignedEvents.length === 0
-      ? 'No Events Assigned'
-      : user.assignedEvents
-          .map(id => events.find(e => e.id === id)?.name || id)
-          .join(', ');
-
-  const credentialsSummaryText = `=== YIN-PIMS STAFF CREDENTIALS ===
-Name: ${user.name}
-Email: ${user.email}
-Role: ${user.role}
-Provisional Password: ${passwordToDisplay}
-Assigned Events: ${assignedEventNames}
-Portal URL: ${window.location.origin}
-
-Instructions: Log in using your email and provisional password. You will be prompted to recreate your secure password upon first sign-in.
-==================================`;
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(credentialsSummaryText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+  const handleCopyFull = async () => {
+    const res = await copyInviteToClipboard(user, passwordToDisplay, events);
+    if (res.success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    }
   };
 
-  const handleSimulateEmail = () => {
-    setSimulatedSent(true);
-    setTimeout(() => setSimulatedSent(false), 3000);
+  const handleOpenEmailClient = () => {
+    dispatchViaMailto(user, passwordToDisplay, events);
+    setMailtoSuccess(true);
+    setTimeout(() => setMailtoSuccess(false), 3000);
+  };
+
+  const handleDispatchFirebaseReset = async () => {
+    setIsSendingFirebaseEmail(true);
+    setFirebaseEmailResult(null);
+    try {
+      const res = await dispatchFirebasePasswordSetup(user.email);
+      setFirebaseEmailResult(res);
+    } catch (err: any) {
+      setFirebaseEmailResult({
+        success: false,
+        message: err?.message || 'Failed to dispatch email',
+      });
+    } finally {
+      setIsSendingFirebaseEmail(false);
+    }
   };
 
   return (
@@ -140,31 +156,92 @@ Instructions: Log in using your email and provisional password. You will be prom
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="grid grid-cols-2 gap-3 pt-1">
-            <button
-              onClick={handleCopy}
-              className={`flex items-center justify-center space-x-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer ${
-                copied 
-                  ? 'bg-emerald-600 text-white' 
-                  : 'bg-[#14595A] text-white hover:bg-[#0E4243]'
-              }`}
-            >
-              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              <span>{copied ? 'Credentials Copied!' : 'Copy Credentials'}</span>
-            </button>
+          {/* Email Dispatch Action Hub */}
+          <div className="space-y-2.5">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[#6B6B66] block">
+              Official Email Delivery Channels
+            </span>
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {/* Option A: Launch Default Mail Client */}
+              <button
+                onClick={handleOpenEmailClient}
+                className={`flex items-center justify-center space-x-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all shadow-2xs border cursor-pointer ${
+                  mailtoSuccess
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                    : 'bg-[#14595A] text-white border-transparent hover:bg-[#0E4243]'
+                }`}
+              >
+                {mailtoSuccess ? <Check className="h-4 w-4 text-emerald-600" /> : <Mail className="h-4 w-4" />}
+                <span>{mailtoSuccess ? 'Mail App Opened!' : 'Send via Email App'}</span>
+              </button>
+
+              {/* Option B: Dispatch Direct Firebase Password Link */}
+              <button
+                onClick={handleDispatchFirebaseReset}
+                disabled={isSendingFirebaseEmail}
+                className="flex items-center justify-center space-x-2 py-2.5 px-3 rounded-xl text-xs font-bold border border-[#E4E4E1] bg-white text-[#1C1C1A] hover:bg-[#FAFAF9] transition-all shadow-2xs cursor-pointer disabled:opacity-60"
+              >
+                {isSendingFirebaseEmail ? (
+                  <RefreshCw className="h-4 w-4 text-[#14595A] animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4 text-[#14595A]" />
+                )}
+                <span>{isSendingFirebaseEmail ? 'Sending...' : 'Send Firebase Setup Email'}</span>
+              </button>
+            </div>
+
+            {/* Option C: Copy full formatted invitation */}
             <button
-              onClick={handleSimulateEmail}
-              className={`flex items-center justify-center space-x-2 py-2.5 px-4 rounded-xl text-xs font-bold border transition-all shadow-2xs cursor-pointer ${
-                simulatedSent
+              onClick={handleCopyFull}
+              className={`w-full flex items-center justify-center space-x-2 py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                copied
                   ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
-                  : 'bg-white border-[#E4E4E1] text-[#1C1C1A] hover:bg-[#FAFAF9]'
+                  : 'bg-white border-[#E4E4E1] text-[#6B6B66] hover:text-[#1C1C1A] hover:bg-[#FAFAF9]'
               }`}
             >
-              {simulatedSent ? <Check className="h-4 w-4 text-emerald-600" /> : <Send className="h-4 w-4 text-[#14595A]" />}
-              <span>{simulatedSent ? 'Email Dispatched!' : 'Simulate Send Email'}</span>
+              {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+              <span>{copied ? 'Full Email Text Copied!' : 'Copy Full Invite Email Text'}</span>
             </button>
+          </div>
+
+          {/* Feedback message for Firebase Email */}
+          {firebaseEmailResult && (
+            <div className={`p-3 rounded-xl text-xs flex items-center space-x-2 ${
+              firebaseEmailResult.success 
+                ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                : 'bg-red-50 border border-red-200 text-red-700'
+            }`}>
+              {firebaseEmailResult.success ? (
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+              ) : (
+                <AlertCircle className="h-4 w-4 text-red-500 shrink-0" />
+              )}
+              <span>{firebaseEmailResult.message}</span>
+            </div>
+          )}
+
+          {/* Expandable Email Preview Accordion */}
+          <div className="border border-[#E4E4E1] rounded-2xl overflow-hidden text-xs">
+            <button
+              onClick={() => setShowPreview(prev => !prev)}
+              className="w-full px-4 py-2.5 bg-gray-50 flex items-center justify-between text-[#6B6B66] font-semibold hover:bg-gray-100 transition-colors cursor-pointer"
+            >
+              <span className="flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5 text-[#14595A]" />
+                <span>Preview Formatted Onboarding Email</span>
+              </span>
+              {showPreview ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+            
+            {showPreview && (
+              <div className="p-4 bg-[#FAFAF9] font-mono text-[11px] text-[#333] space-y-2 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto border-t border-[#E4E4E1]">
+                <div className="text-[#14595A] font-bold border-b border-gray-200 pb-1">
+                  Subject: {subject}
+                </div>
+                <div>{body}</div>
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end pt-2">

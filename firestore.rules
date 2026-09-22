@@ -1,0 +1,46 @@
+﻿rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Staff accounts: Allow unauthenticated get for cross-device credentials & provisional password lookup
+    match /staff_accounts/{emailDoc} {
+      allow get: if true;
+      allow list, write: if true;
+    }
+    
+    // User profile documents
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+    
+    // Events: Allow read for public landing / staff, write for staff
+    match /events/{eventId} {
+      allow read, write: if true;
+    }
+    
+    // Participants: Allow QR scanning check-in and registration
+    match /participants/{participantId} {
+      allow read, write: if true;
+    }
+    
+    // Organizations
+    match /organizations/{orgId} {
+      allow read, write: if true;
+    }
+    
+    // Settings
+    match /settings/{settingId} {
+      allow read, write: if true;
+    }
+    
+    // Activity Logs
+    match /activity_logs/{logId} {
+      allow read, write: if true;
+    }
+    
+    // Global fallback
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

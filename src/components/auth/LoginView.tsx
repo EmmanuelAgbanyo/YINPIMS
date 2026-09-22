@@ -17,7 +17,8 @@ import {
   signInWithEmail, 
   signInWithGoogle, 
   resetUserPassword,
-  getStaffAccountFromFirestore
+  getStaffAccountFromFirestore,
+  decodeStaffProfile
 } from '../../services/firebase';
 import { db } from '../../services/db';
 import { useApp } from '../../context/AppContext';
@@ -60,11 +61,46 @@ export const LoginView: React.FC = () => {
     try {
       const normalizedEmail = email.trim().toLowerCase();
       const trimmedPass = password.trim();
+      const isSuperAdmin = normalizedEmail === 'policyp28@gmail.com';
 
-      // 1. Check local db first
+      // 1. Try Universal Firebase Cloud Auth first (works across all devices worldwide)
+      let fbUser = null;
+      let fbAuthError: any = null;
+
+      try {
+        fbUser = await signInWithEmail(normalizedEmail, trimmedPass);
+      } catch (err: any) {
+        fbAuthError = err;
+      }
+
+      // Check local database for pre-existing user record
       let localUser = db.getUsers().find(u => u.email.toLowerCase() === normalizedEmail);
 
-      // 2. If not found locally, fetch from Cloud Firestore (cross-device synchronization)
+      // If Firebase Auth succeeded, establish session immediately
+      if (fbUser) {
+        const decoded = decodeStaffProfile(fbUser.displayName);
+        
+        let activeUser = localUser;
+        if (!activeUser) {
+          activeUser = db.saveUser({
+            id: fbUser.uid,
+            name: decoded.name || fbUser.displayName || normalizedEmail.split('@')[0],
+            email: normalizedEmail,
+            phone: fbUser.phoneNumber || '',
+            role: isSuperAdmin ? 'ADMIN' : (decoded.role as any) || 'CHECKIN_STAFF',
+            organizationId: 'org-001',
+            assignedEvents: decoded.assignedEvents || ['*'],
+            status: 'Active',
+            mustChangePassword: !isSuperAdmin,
+          });
+        }
+
+        loginWithLocalUser(activeUser);
+        setSuccessMsg(isSuperAdmin ? 'Welcome Super Admin!' : 'Sign in successful!');
+        return;
+      }
+
+      // 2. If not found locally and Firebase failed, check Firestore fallback
       if (!localUser) {
         try {
           const remoteStaff = await getStaffAccountFromFirestore(normalizedEmail);
@@ -90,40 +126,30 @@ export const LoginView: React.FC = () => {
         }
       }
 
-      // 3. Check if staff member is logging in with provisional password
+      // 3. Check local provisional password
       if (localUser && localUser.provisionalPassword && localUser.provisionalPassword === trimmedPass) {
         loginWithLocalUser(localUser);
-        try {
-          await signInWithEmail(email, password);
-        } catch {
-          // Local session validated
-        }
         return;
       }
 
-      // 4. Check if staff member is logging in with their permanent password
+      // 4. Check local permanent password
       if (localUser && localUser.password && localUser.password === trimmedPass) {
         loginWithLocalUser(localUser);
-        try {
-          await signInWithEmail(email, password);
-        } catch {
-          // Local session validated
-        }
         return;
       }
 
-      // 5. Standard sign in with Firebase
-      try {
-        await signInWithEmail(email, password);
-        setSuccessMsg(normalizedEmail === 'policyp28@gmail.com' ? 'Welcome Super Admin!' : 'Sign in successful!');
-      } catch (fbErr: any) {
-        // Resilient fallback for local admin / verified users
-        if (localUser && (normalizedEmail === 'policyp28@gmail.com' || localUser.status === 'Active')) {
-          loginWithLocalUser(localUser);
-          return;
-        }
-        throw fbErr;
+      // 5. If local user is active/admin fallback
+      if (localUser && (isSuperAdmin || localUser.status === 'Active') && !fbAuthError) {
+        loginWithLocalUser(localUser);
+        return;
       }
+
+      // If nothing succeeded, throw the Firebase error or standard invalid credentials
+      if (fbAuthError) {
+        throw fbAuthError;
+      }
+
+      throw new Error('Invalid email or password. Please verify your credentials or contact an administrator.');
     } catch (err: any) {
       setError(formatAuthError(err));
     } finally {

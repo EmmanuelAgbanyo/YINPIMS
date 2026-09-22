@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { db } from '../../services/db';
-import { syncFirestoreDoc, syncStaffAccountToFirestore } from '../../services/firebase';
+import { syncFirestoreDoc, syncStaffAccountToFirestore, registerStaffInFirebaseAuth, encodeStaffProfile } from '../../services/firebase';
 import type { User, UserRole } from '../../types';
 import { StaffInviteCardModal } from './StaffInviteCardModal';
 import { 
@@ -133,6 +133,15 @@ export const TeamAccessView: React.FC = () => {
         mustChangePassword,
       });
 
+      // Real-time Cloud Auth Registration (ensures login works on any device)
+      const passToRegister = provisionalPassword.trim() || savedUser.provisionalPassword || savedUser.password || 'StaffPass123!';
+      const profileMeta = encodeStaffProfile(savedUser.name, savedUser.role, savedUser.assignedEvents);
+      try {
+        await registerStaffInFirebaseAuth(savedUser.email, passToRegister, profileMeta);
+      } catch (authErr) {
+        console.warn('Firebase Auth staff registration note:', authErr);
+      }
+
       // Real-time Sync to Firestore staff_accounts & users collection
       try {
         await syncStaffAccountToFirestore(savedUser);
@@ -188,11 +197,42 @@ export const TeamAccessView: React.FC = () => {
     setTimeout(() => setSupportNotice(null), 5000);
   };
 
-  const handleSupportResetPassword = (member: User) => {
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
+  const [syncAllMsg, setSyncAllMsg] = useState<string | null>(null);
+
+  const handleSyncAllStaffToCloud = async () => {
+    setIsSyncingAll(true);
+    setSyncAllMsg(null);
+    let syncedCount = 0;
+    try {
+      const nonSuperAdmins = data.users.filter(u => u.email.toLowerCase() !== 'policyp28@gmail.com');
+      for (const u of nonSuperAdmins) {
+        const passToSync = u.provisionalPassword || u.password || 'StaffPass123!';
+        const profile = encodeStaffProfile(u.name, u.role, u.assignedEvents);
+        await registerStaffInFirebaseAuth(u.email, passToSync, profile);
+        await syncStaffAccountToFirestore(u);
+        syncedCount++;
+      }
+      setSyncAllMsg(`Successfully synced and registered ${syncedCount} staff accounts to Cloud Auth!`);
+      setTimeout(() => setSyncAllMsg(null), 5000);
+    } catch (err: any) {
+      setSyncAllMsg(`Sync completed with notes: ${err.message}`);
+    } finally {
+      setIsSyncingAll(false);
+    }
+  };
+
+  const handleSupportResetPassword = async (member: User) => {
     const defaultNewPass = generateProvisionalPassword();
     const promptPass = window.prompt(`Issue new provisional password for ${member.name} (${member.email}):`, defaultNewPass);
     if (promptPass !== null) {
       const res = issueProvisionalPassword(member.id, promptPass);
+      const profile = encodeStaffProfile(member.name, member.role, member.assignedEvents);
+      try {
+        await registerStaffInFirebaseAuth(member.email, promptPass, profile);
+      } catch (e) {
+        console.warn('Firebase Auth update note:', e);
+      }
       setInviteCardUser(res.user);
       setInviteCardPassword(res.provisionalPassword);
       setInviteModalOpen(true);
@@ -268,16 +308,36 @@ export const TeamAccessView: React.FC = () => {
           </span>
 
           {canManageStaff && (
-            <button
-              onClick={openCreateModal}
-              className="flex items-center space-x-1.5 rounded-xl bg-[#14595A] px-4 py-2 text-xs font-semibold text-white hover:bg-[#0E4243] transition-colors shadow-2xs cursor-pointer"
-            >
-              <UserPlus className="h-4 w-4" />
-              <span>Add Staff Member</span>
-            </button>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleSyncAllStaffToCloud}
+                disabled={isSyncingAll}
+                className="flex items-center space-x-1.5 rounded-xl border border-[#E4E4E1] bg-white px-3.5 py-2 text-xs font-semibold text-[#1C1C1A] hover:bg-[#FAFAF9] transition-colors shadow-2xs cursor-pointer disabled:opacity-60"
+                title="Register and sync all existing staff accounts to Firebase Cloud Auth for cross-device logins"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 text-[#14595A] ${isSyncingAll ? 'animate-spin' : ''}`} />
+                <span>{isSyncingAll ? 'Syncing...' : 'Sync All to Cloud Auth'}</span>
+              </button>
+
+              <button
+                onClick={openCreateModal}
+                className="flex items-center space-x-1.5 rounded-xl bg-[#14595A] px-4 py-2 text-xs font-semibold text-white hover:bg-[#0E4243] transition-colors shadow-2xs cursor-pointer"
+              >
+                <UserPlus className="h-4 w-4" />
+                <span>Add Staff Member</span>
+              </button>
+            </div>
           )}
         </div>
       </div>
+
+      {/* Cloud Auth Sync Notification */}
+      {syncAllMsg && (
+        <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center space-x-2">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+          <span>{syncAllMsg}</span>
+        </div>
+      )}
 
       {/* Superadmin Operations & Permission Matrix Card */}
       <div className="bg-white p-5 rounded-2xl border border-[#E4E4E1] shadow-2xs space-y-4">
@@ -516,6 +576,16 @@ export const TeamAccessView: React.FC = () => {
                         >
                           <KeyRound className="h-3.5 w-3.5 text-amber-600" />
                           <span>Reset Pass</span>
+                        </button>
+
+                        {/* Email Credentials & Dispatch Modal */}
+                        <button
+                          onClick={() => handleOpenInviteCard(member)}
+                          className="px-2 py-1 text-[11px] font-bold text-emerald-800 hover:bg-emerald-100 rounded-lg transition-colors cursor-pointer flex items-center space-x-1"
+                          title="Dispatch Onboarding / Credentials Email to Staff Member"
+                        >
+                          <Mail className="h-3.5 w-3.5 text-emerald-600" />
+                          <span>Email Invite</span>
                         </button>
 
                         {/* Share Invite Card */}
