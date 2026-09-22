@@ -25,6 +25,7 @@ import { CloudSyncModal } from './components/common/CloudSyncModal';
 import { AuthModal } from './components/auth/AuthModal';
 import { ForcePasswordChangeModal } from './components/auth/ForcePasswordChangeModal';
 import { LoginView } from './components/auth/LoginView';
+import { PublicPassView } from './components/pass/PublicPassView';
 import { auth, onAuthUserChange } from './services/firebase';
 import type { User as FirebaseUser } from 'firebase/auth';
 import type { Event } from './types';
@@ -82,6 +83,40 @@ const MainLayout: React.FC = () => {
     }
   }, [activeRole, activeTab]);
 
+  // Check URL parameters for public pass/badge
+  const [passIdentifier, setPassIdentifier] = useState<string | null>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const queryPass = params.get('pass') || params.get('badge') || params.get('qr');
+      if (queryPass) return queryPass;
+      const match = window.location.pathname.match(/\/(?:badge|pass|verify)\/([^/]+)/i);
+      if (match && match[1]) return decodeURIComponent(match[1]);
+    } catch {
+      // fallback
+    }
+    return null;
+  });
+
+  // Listen to browser popstate for pass URL changes
+  useEffect(() => {
+    const handlePopState = () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const queryPass = params.get('pass') || params.get('badge') || params.get('qr');
+        if (queryPass) {
+          setPassIdentifier(queryPass);
+        } else {
+          const match = window.location.pathname.match(/\/(?:badge|pass|verify)\/([^/]+)/i);
+          setPassIdentifier(match && match[1] ? decodeURIComponent(match[1]) : null);
+        }
+      } catch {
+        // fallback
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   // Render initial loading spinner while restoring auth state
   if (authInitializing) {
     return (
@@ -91,6 +126,31 @@ const MainLayout: React.FC = () => {
           <p className="text-xs font-semibold text-[#6B6B66]">Loading YIN-PIMS System...</p>
         </div>
       </div>
+    );
+  }
+
+  // If a pass QR code was scanned or passed via URL, render live PublicPassView
+  if (passIdentifier) {
+    return (
+      <PublicPassView
+        passIdentifier={passIdentifier}
+        onClose={() => {
+          setPassIdentifier(null);
+          try {
+            window.history.pushState({}, '', window.location.pathname);
+          } catch {
+            // ignore
+          }
+        }}
+        onOpenPortal={() => {
+          setPassIdentifier(null);
+          try {
+            window.history.pushState({}, '', window.location.pathname);
+          } catch {
+            // ignore
+          }
+        }}
+      />
     );
   }
 

@@ -22,7 +22,7 @@ export const CommunicationModal: React.FC<CommunicationModalProps> = ({
   const [channel, setChannel] = useState<'Email' | 'SMS'>('Email');
   const [msgType, setMsgType] = useState<'Confirmation' | 'Reminder'>('Reminder');
   const [timing, setTiming] = useState('24h_before');
-  const [subject, setSubject] = useState('Event Reminder: Global Youth Innovation Summit 2026');
+  const [subject, setSubject] = useState('Event Reminder: Young Investors National Summit 2026');
   const [messageBody, setMessageBody] = useState(
     'Dear Participant,\n\nThis is a friendly reminder that your event begins tomorrow. Please have your Digital QR Badge ready for check-in.\n\nBest regards,\nEvent Operations Team'
   );

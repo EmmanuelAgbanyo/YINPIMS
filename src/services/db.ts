@@ -35,8 +35,8 @@ export interface DatabaseSchema {
 const INITIAL_SEED_DATA: DatabaseSchema = {
   organization: {
     id: 'org-001',
-    name: 'Global Innovation & Leadership Institute',
-    description: 'Empowering delegates and professionals worldwide through high-impact conferences and workshops.',
+    name: 'Young Investors Network',
+    description: 'Empowering youth and young investors through financial literacy, investment summits, and leadership programs.',
     createdAt: '2026-01-15',
     settings: {
       allowWaitlist: true,

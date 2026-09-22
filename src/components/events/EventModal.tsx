@@ -101,7 +101,7 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, initial
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="e.g. Global Youth Innovation Summit 2026"
+              placeholder="e.g. Young Investors National Summit 2026"
               className={`w-full h-9 px-3 text-xs rounded-md border bg-white focus:outline-none focus:ring-1 ${
                 errors.name ? 'border-[#B0413E] focus:ring-[#B0413E]' : 'border-[#E4E4E1] focus:border-[#14595A] focus:ring-[#14595A]'
               }`}

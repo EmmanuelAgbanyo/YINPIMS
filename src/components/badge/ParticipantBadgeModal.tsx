@@ -2,9 +2,10 @@ import React, { useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { toPng } from 'html-to-image';
 import type { Registration, Participant, Event, ParticipantBadgeType } from '../../types';
-import { X, Download, Printer, Copy, Check, ShieldCheck, Bed, Tag } from 'lucide-react';
+import { X, Download, Printer, Copy, Check, ShieldCheck, Bed, Tag, ExternalLink } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { db } from '../../services/db';
+import { getPassUrl } from '../../utils/qrUtils';
 
 interface ParticipantBadgeModalProps {
   isOpen: boolean;
@@ -92,14 +93,14 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
   };
 
   const handleCopyLink = () => {
-    const url = `${window.location.origin}/badge/${registration.qrIdentifier}`;
+    const url = getPassUrl(registration.qrIdentifier);
     navigator.clipboard.writeText(url);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto font-body">
+    <div className="single-badge-modal-root fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto font-body">
       {/* Print stylesheet for single badge printing */}
       <style>{`
         @media print {
@@ -112,25 +113,43 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
             print-color-adjust: exact !important;
             color-adjust: exact !important;
           }
-          body {
-            background-color: white !important;
-            color: black !important;
+          html, body {
+            background: #FFFFFF !important;
+            background-color: #FFFFFF !important;
+            color: #000000 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: visible !important;
+          }
+          .single-badge-modal-root {
+            background: #FFFFFF !important;
+            background-color: #FFFFFF !important;
+            position: static !important;
+            inset: auto !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            overflow: visible !important;
           }
           .no-print {
             display: none !important;
           }
           .printable-badge-container {
-            position: absolute !important;
-            left: 50% !important;
-            top: 50% !important;
-            transform: translate(-50%, -50%) !important;
+            position: relative !important;
+            margin: 20mm auto !important;
+            left: auto !important;
+            top: auto !important;
+            transform: none !important;
             width: 90mm !important;
             max-width: 90mm !important;
             border: 1px solid #E4E4E1 !important;
             box-shadow: none !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-            color-adjust: exact !important;
+            background: #FFFFFF !important;
+            background-color: #FFFFFF !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
         }
       `}</style>
@@ -221,13 +240,26 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
               </div>
 
               {/* QR Code Centerpiece */}
-              <div className="bg-[#FAFAF9] p-3 rounded-xl border border-[#E4E4E1] inline-block shadow-2xs" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                <QRCodeSVG
-                  value={registration.qrIdentifier}
-                  size={140}
-                  level="H"
-                  includeMargin={true}
-                />
+              <div className="space-y-1.5">
+                <a
+                  href={getPassUrl(registration.qrIdentifier)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-[#FAFAF9] p-3 rounded-xl border border-[#E4E4E1] inline-block shadow-2xs hover:border-[#14595A] hover:shadow-md transition-all cursor-pointer group"
+                  style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}
+                  title="Click to open and test live mobile pass view"
+                >
+                  <QRCodeSVG
+                    value={getPassUrl(registration.qrIdentifier)}
+                    size={140}
+                    level="H"
+                    includeMargin={true}
+                  />
+                  <div className="no-print mt-1.5 flex items-center justify-center space-x-1 text-[10px] font-bold text-[#14595A] group-hover:underline">
+                    <ExternalLink className="h-3 w-3" />
+                    <span>Click to Test Pass</span>
+                  </div>
+                </a>
               </div>
 
               {/* Registration ID & Room details */}
@@ -260,6 +292,16 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
 
           {/* Badge Action Buttons */}
           <div className="no-print flex flex-wrap items-center justify-center gap-2 w-full pt-2">
+            <a
+              href={getPassUrl(registration.qrIdentifier)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center space-x-1.5 h-9 px-3.5 bg-[#EBF4F4] text-[#14595A] text-xs font-bold rounded-xl hover:bg-[#D7E9E9] transition-colors cursor-pointer shadow-2xs"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              <span>Open Live Pass</span>
+            </a>
+
             <button
               onClick={handleDownloadPNG}
               disabled={downloading}

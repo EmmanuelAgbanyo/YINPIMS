@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useApp } from '../../context/AppContext';
+import { getPassUrl } from '../../utils/qrUtils';
 import type { Participant, Registration, Event } from '../../types';
 import {
   X,
@@ -117,65 +118,125 @@ export const BatchBadgePrintModal: React.FC<BatchBadgePrintModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black/60 backdrop-blur-xs overflow-hidden">
+    <div className="batch-print-modal-root fixed inset-0 z-50 flex flex-col bg-black/60 backdrop-blur-xs overflow-hidden">
       {/* Dynamic CSS for Print Layout */}
       <style>{`
         @media print {
           @page {
             size: A4 portrait;
-            margin: 8mm;
+            margin: 6mm 6mm;
           }
           *, *::before, *::after {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
             color-adjust: exact !important;
           }
-          body {
-            background-color: white !important;
-            color: black !important;
+          html, body {
+            background: #FFFFFF !important;
+            background-color: #FFFFFF !important;
+            color: #000000 !important;
             font-family: system-ui, -apple-system, sans-serif !important;
             margin: 0 !important;
             padding: 0 !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-            color-adjust: exact !important;
+            width: 100% !important;
+            height: auto !important;
+            min-height: 0 !important;
+            overflow: visible !important;
           }
+
+          /* Force all modal wrappers, backdrops, and containers to pure white */
+          .batch-print-modal-root,
+          .batch-print-workspace,
+          .print-container {
+            background: #FFFFFF !important;
+            background-color: #FFFFFF !important;
+            position: static !important;
+            inset: auto !important;
+            width: 100% !important;
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+            box-shadow: none !important;
+            overflow: visible !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+          }
+
           /* Hide all UI elements except printable pages */
           .no-print {
             display: none !important;
           }
-          .print-container {
+
+          /* Page wrapper for strict A4 pagination without bleed */
+          .a4-page-wrapper {
             display: block !important;
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
+            page-break-before: auto !important;
+            page-break-after: always !important;
+            break-after: page !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            margin: 0 auto !important;
+            padding: 0 !important;
             width: 100% !important;
+            background: #FFFFFF !important;
+            background-color: #FFFFFF !important;
           }
+
+          .a4-page-wrapper:last-child {
+            page-break-after: auto !important;
+            break-after: auto !important;
+          }
+
+          /* Exactly 1 A4 printable grid per sheet: 2x2 layout */
           .a4-print-page {
-            page-break-after: always;
-            break-after: page;
-            width: 190mm;
-            height: 275mm;
-            margin: 0 auto;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            grid-template-rows: 1fr 1fr;
-            gap: 6mm;
-            box-sizing: border-box;
-            padding: 2mm;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-            color-adjust: exact !important;
+            width: 196mm !important;
+            max-width: 196mm !important;
+            height: 280mm !important;
+            max-height: 280mm !important;
+            min-height: 0 !important;
+            margin: 0 auto !important;
+            padding: 2mm !important;
+            box-sizing: border-box !important;
+            display: grid !important;
+            grid-template-columns: repeat(2, 1fr) !important;
+            grid-template-rows: repeat(2, 1fr) !important;
+            gap: 4mm !important;
+            border: none !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            background: #FFFFFF !important;
+            background-color: #FFFFFF !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            overflow: hidden !important;
           }
+
           /* Remove shadows and rounded outer gaps during physical printing */
           .badge-print-card {
             box-shadow: none !important;
             border: 1px dashed #A3A39E !important;
-            page-break-inside: avoid;
-            break-inside: avoid;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-            color-adjust: exact !important;
+            border-radius: 6px !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            background: #FFFFFF !important;
+            background-color: #FFFFFF !important;
+            height: 100% !important;
+            max-height: 136mm !important;
+            box-sizing: border-box !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+            overflow: hidden !important;
+            padding: 8px !important;
+          }
+
+          .empty-badge-cell {
+            border: 1px dashed #E4E4E1 !important;
+            background: #FFFFFF !important;
+            opacity: 0.2 !important;
           }
         }
       `}</style>
@@ -228,7 +289,7 @@ export const BatchBadgePrintModal: React.FC<BatchBadgePrintModalProps> = ({
       </div>
 
       {/* Screen Workspace Area */}
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden bg-[#2D2D2A]">
+      <div className="batch-print-workspace flex-1 flex flex-col md:flex-row overflow-hidden bg-[#2D2D2A]">
         {/* Left Filter & Selection Sidebar (Hidden in print) */}
         <div className="no-print w-full md:w-80 bg-[#1C1C1A] border-r border-white/10 p-4 overflow-y-auto space-y-4 text-xs text-white shrink-0">
           <div className="font-bold text-xs uppercase tracking-wider text-[#A3A39E] flex items-center space-x-1.5 pb-2 border-b border-white/10">
@@ -354,7 +415,7 @@ export const BatchBadgePrintModal: React.FC<BatchBadgePrintModalProps> = ({
 
           {a4Pages.length > 0 ? (
             a4Pages.map((pageItems, pageIdx) => (
-              <div key={pageIdx} className="flex flex-col items-center space-y-2">
+              <div key={pageIdx} className="a4-page-wrapper flex flex-col items-center space-y-2 print:space-y-0">
                 {/* Page Indicator for screen preview */}
                 <div className="no-print text-xs font-mono text-[#A3A39E] self-start font-semibold flex items-center space-x-2">
                   <span className="bg-white/10 px-2 py-0.5 rounded text-white">
@@ -364,7 +425,7 @@ export const BatchBadgePrintModal: React.FC<BatchBadgePrintModalProps> = ({
                 </div>
 
                 {/* A4 Sheet Paper Mockup Container */}
-                <div className="a4-print-page bg-white border border-[#E4E4E1] shadow-2xl rounded-sm p-4 w-[210mm] max-w-full min-h-[285mm] grid grid-cols-2 grid-rows-2 gap-4 box-sizing-border font-body text-[#1C1C1A]">
+                <div className="a4-print-page bg-white border border-[#E4E4E1] shadow-2xl rounded-sm p-4 w-[210mm] max-w-full min-h-[285mm] print:min-h-0 print:w-auto print:shadow-none print:border-none grid grid-cols-2 grid-rows-2 gap-4 box-sizing-border font-body text-[#1C1C1A]">
                   {pageItems.map(({ reg, participant, event, room }) => (
                     <div
                       key={reg.id}
@@ -421,7 +482,7 @@ export const BatchBadgePrintModal: React.FC<BatchBadgePrintModalProps> = ({
                         {/* QR Code Centerpiece */}
                         <div className="bg-[#FAFAF9] p-2 rounded-md border border-[#E4E4E1] inline-block shadow-2xs" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
                           <QRCodeSVG
-                            value={reg.qrIdentifier}
+                            value={getPassUrl(reg.qrIdentifier)}
                             size={110}
                             level="H"
                             includeMargin={false}
@@ -457,10 +518,12 @@ export const BatchBadgePrintModal: React.FC<BatchBadgePrintModalProps> = ({
                   {Array.from({ length: 4 - pageItems.length }).map((_, emptyIdx) => (
                     <div
                       key={`empty-${emptyIdx}`}
-                      className="border border-dashed border-[#E4E4E1] rounded-lg p-4 flex flex-col items-center justify-center text-center text-xs text-[#A3A39E] bg-[#FAFAF9]/40"
+                      className="empty-badge-cell border border-dashed border-[#E4E4E1] rounded-lg p-4 flex flex-col items-center justify-center text-center text-xs text-[#A3A39E] bg-[#FAFAF9]/40 print:bg-white print:border-dashed print:border-[#E4E4E1]"
                     >
-                      <Scissors className="h-4 w-4 mb-1 opacity-40" />
-                      <span>Empty Badge Cell</span>
+                      <div className="no-print flex flex-col items-center">
+                        <Scissors className="h-4 w-4 mb-1 opacity-40" />
+                        <span>Empty Badge Cell</span>
+                      </div>
                     </div>
                   ))}
                 </div>

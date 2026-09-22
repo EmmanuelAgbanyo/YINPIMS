@@ -5,6 +5,7 @@ import { db } from '../../services/db';
 import type { Registration, Participant, ParticipantBadgeType, Event } from '../../types';
 import { BatchBadgePrintModal } from '../badge/BatchBadgePrintModal';
 import { ParticipantBadgeModal, getBadgeTitleTheme } from '../badge/ParticipantBadgeModal';
+import { extractPassIdentifier, playSuccessBeep, triggerHapticFeedback } from '../../utils/qrUtils';
 import {
   Search,
   CheckCircle2,
@@ -126,24 +127,31 @@ export const CheckInView: React.FC<CheckInViewProps> = ({ filterEventId }) => {
 
   // Handle Scan Logic
   const handleScanCode = (qrCodeString: string) => {
-    if (!activeEvent) return;
-
+    const cleanCode = extractPassIdentifier(qrCodeString);
     const allRegs = data.registrations;
-    const reg = allRegs.find(r => r.qrIdentifier === qrCodeString || r.id === qrCodeString);
+    const reg = allRegs.find(
+      r =>
+        r.qrIdentifier.toLowerCase() === cleanCode.toLowerCase() ||
+        r.id.toLowerCase() === cleanCode.toLowerCase() ||
+        r.qrIdentifier.toLowerCase() === qrCodeString.trim().toLowerCase() ||
+        r.id.toLowerCase() === qrCodeString.trim().toLowerCase()
+    );
 
     if (!reg) {
       setScanResult({
         status: 'invalid',
-        message: `Invalid QR Code scanned: "${qrCodeString}". No matching registration record found.`,
+        message: `Invalid QR Code scanned: "${qrCodeString}". No matching registration record found in system.`,
       });
       return;
     }
 
-    if (reg.eventId !== activeEvent.id) {
+    if (!activeEvent || reg.eventId !== activeEvent.id) {
       const otherEvent = data.events.find(e => e.id === reg.eventId);
       setScanResult({
         status: 'wrong_event',
         message: `QR Code belongs to another event: "${otherEvent?.name || 'Unknown Event'}".`,
+        registration: reg,
+        participant: data.participants.find(p => p.id === reg.participantId),
       });
       return;
     }
@@ -152,6 +160,8 @@ export const CheckInView: React.FC<CheckInViewProps> = ({ filterEventId }) => {
       setScanResult({
         status: 'waitlisted',
         message: `Participant is currently on the WAITLIST (Position #${reg.waitlistPosition}). Cannot check in.`,
+        registration: reg,
+        participant: data.participants.find(p => p.id === reg.participantId),
       });
       return;
     }
@@ -161,7 +171,7 @@ export const CheckInView: React.FC<CheckInViewProps> = ({ filterEventId }) => {
     if (reg.checkInStatus === 'Checked In') {
       setScanResult({
         status: 'already_checked_in',
-        message: `Participant ${participant?.fullName || ''} was ALREADY checked in on ${new Date(reg.checkInTimestamp || '').toLocaleTimeString()}.`,
+        message: `Participant ${participant?.fullName || ''} was ALREADY checked in on ${new Date(reg.checkInTimestamp || '').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`,
         participant,
         registration: reg,
       });
@@ -171,6 +181,8 @@ export const CheckInView: React.FC<CheckInViewProps> = ({ filterEventId }) => {
     // Perform Check-in
     const res = db.updateCheckInStatus(reg.id, true);
     refreshData();
+    playSuccessBeep();
+    triggerHapticFeedback();
 
     setScanResult({
       status: 'success',
@@ -194,6 +206,10 @@ export const CheckInView: React.FC<CheckInViewProps> = ({ filterEventId }) => {
   const handleToggleCheckIn = (regId: string, checkIn: boolean, participantName: string) => {
     db.updateCheckInStatus(regId, checkIn);
     refreshData();
+    if (checkIn) {
+      playSuccessBeep();
+      triggerHapticFeedback();
+    }
 
     setToast({
       id: Date.now(),
@@ -332,13 +348,17 @@ export const CheckInView: React.FC<CheckInViewProps> = ({ filterEventId }) => {
         // Search query
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase().trim();
+          const cleanQ = extractPassIdentifier(q).toLowerCase();
           const nameMatch = p.fullName.toLowerCase().includes(q);
           const emailMatch = p.email.toLowerCase().includes(q);
           const phoneMatch = p.phone ? p.phone.toLowerCase().includes(q) : false;
-          const regIdMatch = reg.id.toLowerCase().includes(q);
+          const regIdMatch = reg.id.toLowerCase().includes(q) || reg.id.toLowerCase().includes(cleanQ);
+          const qrMatch = reg.qrIdentifier
+            ? reg.qrIdentifier.toLowerCase().includes(q) || reg.qrIdentifier.toLowerCase().includes(cleanQ)
+            : false;
           const orgMatch = p.organization ? p.organization.toLowerCase().includes(q) : false;
           const badgeMatch = (reg.badgeType || p.badgeType || '').toLowerCase().includes(q);
-          if (!nameMatch && !emailMatch && !phoneMatch && !regIdMatch && !orgMatch && !badgeMatch) {
+          if (!nameMatch && !emailMatch && !phoneMatch && !regIdMatch && !qrMatch && !orgMatch && !badgeMatch) {
             return false;
           }
         }
@@ -508,18 +528,22 @@ export const CheckInView: React.FC<CheckInViewProps> = ({ filterEventId }) => {
                   <span>Instant Test Scans</span>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5">
-                  <button
-                    onClick={() => handleScanCode('QR-PIMS-EVT101-PRT001-REG01')}
-                    className="h-7 px-2 bg-white text-[10px] font-medium rounded border border-[#E4E4E1] hover:bg-[#FAFAF9] text-left truncate cursor-pointer"
-                  >
-                    Elena Rostova (Valid)
-                  </button>
-                  <button
-                    onClick={() => handleScanCode('QR-PIMS-EVT101-PRT002-REG02')}
-                    className="h-7 px-2 bg-white text-[10px] font-medium rounded border border-[#E4E4E1] hover:bg-[#FAFAF9] text-left truncate cursor-pointer"
-                  >
-                    Marcus Vance (Valid)
-                  </button>
+                  {confirmedRegistrations.slice(0, 4).map(r => {
+                    const p = data.participants.find(part => part.id === r.participantId);
+                    return (
+                      <button
+                        key={r.id}
+                        onClick={() => handleScanCode(r.qrIdentifier)}
+                        className="h-7 px-2 bg-white text-[10px] font-medium rounded border border-[#E4E4E1] hover:bg-[#FAFAF9] text-left truncate cursor-pointer"
+                        title={r.qrIdentifier}
+                      >
+                        {p?.fullName || r.id} ({r.checkInStatus === 'Checked In' ? 'Checked In' : 'Pending'})
+                      </button>
+                    );
+                  })}
+                  {confirmedRegistrations.length === 0 && (
+                    <span className="text-[10px] text-[#6B6B66] col-span-2">No confirmed attendees for this event yet.</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -554,6 +578,18 @@ export const CheckInView: React.FC<CheckInViewProps> = ({ filterEventId }) => {
                   {scanResult.status === 'waitlisted' && 'WAITLISTED PARTICIPANT'}
                 </h3>
                 <p className="text-xs mt-0.5 font-medium leading-relaxed">{scanResult.message}</p>
+                {scanResult.status === 'wrong_event' && scanResult.registration && (
+                  <button
+                    onClick={() => {
+                      setActiveEventId(scanResult.registration!.eventId);
+                      setSelectedEventId(scanResult.registration!.eventId);
+                      handleScanCode(scanResult.registration!.qrIdentifier);
+                    }}
+                    className="mt-2 inline-flex items-center space-x-1.5 px-3 py-1 bg-[#14595A] text-white text-[11px] font-bold rounded-md hover:bg-[#0E4243] cursor-pointer"
+                  >
+                    <span>Switch to this Event & Check In</span>
+                  </button>
+                )}
               </div>
             </div>
             <button

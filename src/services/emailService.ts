@@ -37,7 +37,7 @@ export const generateStaffInviteText = (
   const subject = `Welcome to YIN-PIMS - Staff Portal Access Credentials for ${user.name}`;
 
   const body = `Dear ${user.name},
-You have been granted official operational access to the Youth Impact Network Participant Information Management System (YIN-PIMS).
+You have been granted official operational access to the Young Investors Network Participant Information Management System (YIN-PIMS).
 
 ===================================================
 YOUR ACCESS CREDENTIALS
@@ -60,7 +60,7 @@ Your provisional password is valid for first-time account initialization only. F
 If you encounter any difficulty accessing the system, please contact your Super Administrator.
 
 Best regards,
-Youth Impact Network (YIN) Operations Team
+Young Investors Network (YIN) Operations Team
 YIN-PIMS Administration
 `;
 
