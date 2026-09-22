@@ -4,7 +4,14 @@ import type { DatabaseSchema } from '../services/db';
 import type { User, UserRole, Event } from '../types';
 import { syncService } from '../services/sync';
 import type { SyncStatus, SyncConfig } from '../services/sync';
-import { onAuthUserChange, logoutUser, syncStaffAccountToFirestore, updateCurrentUserPassword } from '../services/firebase';
+import { 
+  onAuthUserChange, 
+  logoutUser, 
+  syncStaffAccountToFirestore, 
+  updateCurrentUserPassword,
+  subscribeAllUsers,
+  syncFirestoreDoc
+} from '../services/firebase';
 import type { User as FirebaseUser } from 'firebase/auth';
 
 const SUPERADMIN_EMAIL = 'policyp28@gmail.com';
@@ -35,6 +42,7 @@ interface AppContextType {
   completePasswordReset: (newPassword: string) => void;
   issueProvisionalPassword: (userId: string, customPassword?: string) => { user: User; provisionalPassword: string };
   loginWithLocalUser: (user: User) => void;
+  assignUserRole: (userId: string, newRole: UserRole, assignedEvents?: string[]) => Promise<void>;
   logout: () => Promise<void>;
   hasPermission: (action: 'manage_org' | 'manage_staff' | 'create_event' | 'delete_event' | 'manage_forms' | 'check_in' | 'manage_accommodation') => boolean;
 }
@@ -90,29 +98,91 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   useEffect(() => {
-    // Listen for Firebase Auth user changes
+    let unsubscribeUsers: (() => void) | null = null;
+
+    // Listen for Firebase Auth user changes (Google OAuth & Email sign-ins)
     const unsubscribeAuth = onAuthUserChange((fbUser: FirebaseUser | null) => {
       if (fbUser) {
-        const isSuperAdmin = fbUser.email?.toLowerCase() === SUPERADMIN_EMAIL.toLowerCase();
-        const existingLocalUser = db.getUsers().find(u => u.email.toLowerCase() === fbUser.email?.toLowerCase());
+        const normalizedEmail = (fbUser.email || '').toLowerCase().trim();
+        const isSuperAdmin = normalizedEmail === SUPERADMIN_EMAIL.toLowerCase();
+        let existingLocalUser = db.getUsers().find(u => u.email.toLowerCase() === normalizedEmail);
+
+        // Auto-register Google users who do not exist in local database
+        if (!existingLocalUser) {
+          existingLocalUser = db.saveUser({
+            id: fbUser.uid,
+            name: fbUser.displayName || normalizedEmail.split('@')[0] || 'Google User',
+            email: normalizedEmail,
+            phone: fbUser.phoneNumber || '',
+            role: isSuperAdmin ? 'ADMIN' : 'CHECKIN_STAFF',
+            organizationId: 'org-001',
+            assignedEvents: ['*'],
+            status: 'Active',
+            avatarUrl: fbUser.photoURL || undefined,
+            createdAt: new Date().toISOString(),
+          });
+        }
+
+        // Always sync user to Firestore so Superadmin sees them in real time
+        try {
+          syncFirestoreDoc('users', existingLocalUser.id, {
+            id: existingLocalUser.id,
+            name: existingLocalUser.name,
+            email: existingLocalUser.email,
+            phone: existingLocalUser.phone || '',
+            role: existingLocalUser.role,
+            organizationId: 'org-001',
+            assignedEvents: existingLocalUser.assignedEvents || ['*'],
+            status: existingLocalUser.status || 'Active',
+            avatarUrl: existingLocalUser.avatarUrl || fbUser.photoURL || '',
+            lastLoginAt: new Date().toISOString(),
+          });
+        } catch (syncErr) {
+          console.warn('Sync user profile note:', syncErr);
+        }
 
         const activeUser: User = {
-          id: fbUser.uid,
-          name: existingLocalUser?.name || fbUser.displayName || (isSuperAdmin ? 'Super Admin' : fbUser.email || 'Authorized User'),
-          email: fbUser.email || '',
-          phone: fbUser.phoneNumber || existingLocalUser?.phone || '',
-          role: existingLocalUser?.role || (isSuperAdmin ? 'ADMIN' : 'ADMIN'),
-          organizationId: 'org-001',
-          assignedEvents: existingLocalUser?.assignedEvents || ['*'],
-          status: existingLocalUser?.status || 'Active',
-          avatarUrl: fbUser.photoURL || existingLocalUser?.avatarUrl,
-          mustChangePassword: existingLocalUser?.mustChangePassword || false,
-          provisionalPassword: existingLocalUser?.provisionalPassword,
+          ...existingLocalUser,
+          avatarUrl: fbUser.photoURL || existingLocalUser.avatarUrl,
         };
 
         setCurrentUser(activeUser);
         setSessionUser(activeUser);
         localStorage.setItem('PIMS_SESSION_USER', JSON.stringify(activeUser));
+        refreshData();
+
+        // If Super Admin is logged in, subscribe to all cloud users in real-time
+        if (isSuperAdmin) {
+          if (unsubscribeUsers) unsubscribeUsers();
+          unsubscribeUsers = subscribeAllUsers((remoteUsers) => {
+            if (remoteUsers && remoteUsers.length > 0) {
+              let updatedAny = false;
+              remoteUsers.forEach(ru => {
+                if (ru.email) {
+                  const existing = db.getUsers().find(u => u.email.toLowerCase() === ru.email.toLowerCase());
+                  if (!existing) {
+                    db.saveUser({
+                      id: ru.id || ru.uid || `usr-${Date.now()}`,
+                      name: ru.name || ru.displayName || ru.email.split('@')[0],
+                      email: ru.email.toLowerCase(),
+                      phone: ru.phone || '',
+                      role: ru.role || 'CHECKIN_STAFF',
+                      organizationId: 'org-001',
+                      assignedEvents: ru.assignedEvents || ['*'],
+                      status: ru.status || 'Active',
+                      avatarUrl: ru.avatarUrl || ru.photoURL || '',
+                      createdAt: ru.createdAt || new Date().toISOString(),
+                    });
+                    updatedAny = true;
+                  }
+                }
+              });
+              if (updatedAny) {
+                refreshData();
+              }
+            }
+          });
+        }
       }
     });
 
@@ -128,18 +198,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     window.addEventListener('PIMS_LOCAL_DATA_REFRESH', handleDataRefresh);
 
-    // Auto-sync existing local staff accounts to Cloud Firestore for cross-device access
-    try {
-      const localStaff = db.getUsers().filter(u => u.email.toLowerCase() !== SUPERADMIN_EMAIL.toLowerCase());
-      localStaff.forEach(u => {
-        syncStaffAccountToFirestore(u);
-      });
-    } catch (syncErr) {
-      console.warn('Initial staff sync error note:', syncErr);
-    }
-
     return () => {
       unsubscribeAuth();
+      if (unsubscribeUsers) unsubscribeUsers();
       unsubscribeStatus();
       window.removeEventListener('PIMS_LOCAL_DATA_REFRESH', handleDataRefresh);
     };
@@ -204,6 +265,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCurrentUser(user);
     setSessionUser(user);
     localStorage.setItem('PIMS_SESSION_USER', JSON.stringify(user));
+    refreshData();
+  };
+
+  const assignUserRole = async (userId: string, newRole: UserRole, assignedEvents?: string[]) => {
+    const userToUpdate = db.getUsers().find(u => u.id === userId);
+    if (!userToUpdate) return;
+    const updated: User = {
+      ...userToUpdate,
+      role: newRole,
+      assignedEvents: assignedEvents !== undefined ? assignedEvents : userToUpdate.assignedEvents,
+    };
+    db.saveUser(updated);
+    try {
+      await syncFirestoreDoc('users', updated.id, {
+        id: updated.id,
+        name: updated.name,
+        email: updated.email,
+        phone: updated.phone || '',
+        role: updated.role,
+        organizationId: updated.organizationId || 'org-001',
+        assignedEvents: updated.assignedEvents || ['*'],
+        status: updated.status || 'Active',
+        avatarUrl: updated.avatarUrl || '',
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (e) {
+      console.warn('Failed to sync updated role to cloud:', e);
+    }
     refreshData();
   };
 
@@ -288,6 +377,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         issueProvisionalPassword,
         sessionUser,
         loginWithLocalUser,
+        assignUserRole,
         logout,
         hasPermission,
       }}

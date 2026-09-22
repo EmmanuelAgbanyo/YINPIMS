@@ -36,7 +36,8 @@ export const TeamAccessView: React.FC = () => {
     refreshData, 
     hasPermission, 
     startImpersonation,
-    issueProvisionalPassword 
+    issueProvisionalPassword,
+    assignUserRole
   } = useApp();
   
   const [searchTerm, setSearchTerm] = useState('');
@@ -535,9 +536,25 @@ export const TeamAccessView: React.FC = () => {
 
                   {/* Actions & Superadmin Support Controls */}
                   <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2.5">
-                    <span className="text-xs font-semibold px-3 py-1 rounded-lg bg-[#FAFAF9] text-[#14595A] border border-[#E4E4E1]">
-                      {member.role === 'ADMIN' ? 'Administrator' : member.role === 'EVENT_COORDINATOR' ? 'Coordinator' : 'Check-In Staff'}
-                    </span>
+                    {isSuperAdminUser && !isSuperAdmin ? (
+                      <div className="flex items-center space-x-1.5">
+                        <span className="text-[10px] font-bold text-[#6B6B66] uppercase tracking-wider hidden sm:inline">Role:</span>
+                        <select
+                          value={member.role}
+                          onChange={(e) => assignUserRole(member.id, e.target.value as UserRole)}
+                          className="text-xs font-bold px-2.5 py-1 rounded-xl bg-white border border-[#14595A]/30 text-[#14595A] hover:border-[#14595A] focus:outline-none focus:ring-2 focus:ring-[#14595A]/20 cursor-pointer shadow-2xs"
+                          title="Assign new role to this user"
+                        >
+                          <option value="ADMIN">👑 Admin</option>
+                          <option value="EVENT_COORDINATOR">🎯 Coordinator</option>
+                          <option value="CHECKIN_STAFF">📱 Check-In Staff</option>
+                        </select>
+                      </div>
+                    ) : (
+                      <span className="text-xs font-semibold px-3 py-1 rounded-lg bg-[#FAFAF9] text-[#14595A] border border-[#E4E4E1]">
+                        {member.role === 'ADMIN' ? '👑 Administrator' : member.role === 'EVENT_COORDINATOR' ? '🎯 Coordinator' : '📱 Check-In Staff'}
+                      </span>
+                    )}
 
                     <button
                       onClick={() => handleToggleStatus(member)}

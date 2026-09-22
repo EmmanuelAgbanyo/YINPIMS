@@ -13,11 +13,15 @@
       }
     ]
   },
+  "firestore": {
+    "rules": "firestore.rules"
+  },
   "auth": {
     "authorizedDomains": [
       "localhost",
       "yinpims.firebaseapp.com",
-      "yinpims.web.app"
+      "yinpims.web.app",
+      "yinpims.vercel.app"
     ],
     "providers": {
       "emailPassword": true,

@@ -20,7 +20,9 @@ import {
   doc, 
   setDoc, 
   getDoc, 
-  onSnapshot 
+  onSnapshot,
+  collection,
+  getDocs
 } from "firebase/firestore";
 import { getAnalytics, isSupported } from "firebase/analytics";
 
@@ -137,6 +139,28 @@ export const subscribeFirestoreDoc = (collectionName: string, docId: string, cal
     }
   });
 };
+
+export const subscribeAllUsers = (callback: (users: any[]) => void) => {
+  const usersRef = collection(firestore, 'users');
+  return onSnapshot(usersRef, (snapshot) => {
+    const list = snapshot.docs.map(d => d.data());
+    callback(list);
+  }, (err) => {
+    console.warn('subscribeAllUsers note:', err);
+  });
+};
+
+export const fetchAllUsersFromFirestore = async (): Promise<any[]> => {
+  try {
+    const usersRef = collection(firestore, 'users');
+    const snap = await getDocs(usersRef);
+    return snap.docs.map(d => d.data());
+  } catch (err) {
+    console.warn('fetchAllUsersFromFirestore note:', err);
+    return [];
+  }
+};
+
 
 export const updateCurrentUserPassword = async (newPassword: string) => {
   if (auth.currentUser) {
