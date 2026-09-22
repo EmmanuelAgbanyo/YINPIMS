@@ -15,6 +15,7 @@ import {
   Filter,
   Users,
   Scissors,
+  Building,
 } from 'lucide-react';
 
 interface BatchBadgePrintModalProps {
@@ -492,21 +493,46 @@ export const BatchBadgePrintModal: React.FC<BatchBadgePrintModalProps> = ({
 
                       {/* Badge Main Body */}
                       <div className="py-2 px-1 text-center flex-1 flex flex-col items-center justify-center space-y-1.5">
-                        <div>
-                          <h2 className="font-heading font-bold text-sm text-[#1C1C1A] tracking-tight leading-snug">
-                            {participant.fullName}
-                          </h2>
-                          {participant.organization && (
-                            <p className="text-[10px] font-semibold text-[#14595A] mt-0.5 line-clamp-1">
-                              {participant.organization}
-                            </p>
-                          )}
-                          {participant.jobTitle && (
-                            <p className="text-[9px] text-[#6B6B66] line-clamp-1">
-                              {participant.jobTitle}
-                            </p>
-                          )}
-                        </div>
+                        {(() => {
+                          const effectiveOrg = participant.organization || (() => {
+                            if (!reg.responses) return '';
+                            for (const [key, val] of Object.entries(reg.responses)) {
+                              if (typeof val === 'string' && val.trim()) {
+                                const q = data.questions.find(quest => quest.id === key);
+                                const label = (q?.label || key).toLowerCase();
+                                if (
+                                  label.includes('institution') ||
+                                  label.includes('school') ||
+                                  label.includes('organization') ||
+                                  label.includes('university') ||
+                                  label.includes('college')
+                                ) {
+                                  return val.trim();
+                                }
+                              }
+                            }
+                            return '';
+                          })();
+
+                          return (
+                            <div>
+                              <h2 className="font-heading font-bold text-sm text-[#1C1C1A] tracking-tight leading-snug">
+                                {participant.fullName}
+                              </h2>
+                              {effectiveOrg && (
+                                <p className="text-[10px] font-bold text-[#14595A] mt-0.5 line-clamp-1 flex items-center justify-center gap-1" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                                  <Building className="h-2.5 w-2.5 shrink-0" />
+                                  <span>{effectiveOrg}</span>
+                                </p>
+                              )}
+                              {participant.jobTitle && (
+                                <p className="text-[9px] text-[#6B6B66] line-clamp-1">
+                                  {participant.jobTitle}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })()}
 
                         {/* QR Code Centerpiece */}
                         <div className="bg-[#FAFAF9] p-2 rounded-md border border-[#E4E4E1] inline-block shadow-2xs" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>

@@ -431,8 +431,25 @@ class StorageService {
   public ensureDefaultQuestions(eventId: string, accommodationEnabled: boolean): void {
     const existing = this.getQuestionsForEvent(eventId);
     if (existing.length > 0) {
-      // Update system question for accommodation if needed
       let updated = [...existing];
+      const hasInstitution = updated.some(q =>
+        q.id === `sys-institution-${eventId}` ||
+        q.label.toLowerCase().includes('institution') ||
+        q.label.toLowerCase().includes('school') ||
+        q.label.toLowerCase().includes('organization')
+      );
+      if (!hasInstitution) {
+        updated.push({
+          id: `sys-institution-${eventId}`,
+          eventId,
+          label: 'Institution / School',
+          type: 'short_text',
+          required: false,
+          position: updated.length + 1,
+          isSystemQuestion: true,
+        });
+      }
+
       const hasAccom = updated.some(q => q.id === `sys-accom-${eventId}`);
       if (accommodationEnabled && !hasAccom) {
         updated.push({
@@ -454,7 +471,8 @@ class StorageService {
       { id: `sys-name-${eventId}`, eventId, label: 'Full Name', type: 'short_text', required: true, position: 1, isSystemQuestion: true },
       { id: `sys-email-${eventId}`, eventId, label: 'Email Address', type: 'email', required: true, position: 2, isSystemQuestion: true },
       { id: `sys-phone-${eventId}`, eventId, label: 'Phone Number', type: 'phone', required: true, position: 3, isSystemQuestion: true },
-      { id: `sys-gender-${eventId}`, eventId, label: 'Gender', type: 'dropdown', required: true, options: ['Male', 'Female', 'Other', 'Prefer not to say'], position: 4, isSystemQuestion: true },
+      { id: `sys-institution-${eventId}`, eventId, label: 'Institution / School', type: 'short_text', required: false, position: 4, isSystemQuestion: true },
+      { id: `sys-gender-${eventId}`, eventId, label: 'Gender', type: 'dropdown', required: true, options: ['Male', 'Female', 'Other', 'Prefer not to say'], position: 5, isSystemQuestion: true },
     ];
 
     if (accommodationEnabled) {
@@ -465,7 +483,7 @@ class StorageService {
         type: 'multiple_choice',
         required: true,
         options: ['Yes', 'No'],
-        position: 5,
+        position: 6,
         isSystemQuestion: true,
       });
     }
@@ -563,12 +581,37 @@ class StorageService {
       }
     }
 
+    // Extract organization / institution from participantData or responses
+    let organization = participantData.organization?.trim();
+    if (!organization && responses) {
+      for (const [qId, val] of Object.entries(responses)) {
+        const q = this.data.questions.find(quest => quest.id === qId);
+        const label = (q?.label || qId).toLowerCase();
+        if (
+          label.includes('institution') ||
+          label.includes('school') ||
+          label.includes('organization') ||
+          label.includes('university') ||
+          label.includes('college') ||
+          label.includes('company') ||
+          label.includes('affiliation')
+        ) {
+          if (typeof val === 'string' && val.trim()) {
+            organization = val.trim();
+            break;
+          }
+        }
+      }
+    }
+
     // Save or update participant profile
     let participant: Participant;
     if (duplicateParticipant) {
       participant = {
         ...duplicateParticipant,
         badgeType: participantData.badgeType || duplicateParticipant.badgeType || 'Delegate',
+        organization: organization || duplicateParticipant.organization,
+        jobTitle: participantData.jobTitle || duplicateParticipant.jobTitle,
       };
       const pIndex = this.data.participants.findIndex(p => p.id === duplicateParticipant.id);
       if (pIndex !== -1) {
@@ -582,7 +625,7 @@ class StorageService {
         phone: normalizedPhone,
         gender: (participantData.gender as any) || 'Prefer not to say',
         badgeType: participantData.badgeType || 'Delegate',
-        organization: participantData.organization,
+        organization: organization || undefined,
         jobTitle: participantData.jobTitle,
         createdAt: new Date().toISOString(),
       };

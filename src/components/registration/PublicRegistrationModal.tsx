@@ -27,6 +27,7 @@ export const PublicRegistrationModal: React.FC<PublicRegistrationModalProps> = (
 
   // Form State
   const [badgeType, setBadgeType] = useState<ParticipantBadgeType>('Delegate');
+  const [fallbackInstitution, setFallbackInstitution] = useState('');
   const [formAnswers, setFormAnswers] = useState<Record<string, string | string[]>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -91,11 +92,22 @@ export const PublicRegistrationModal: React.FC<PublicRegistrationModalProps> = (
       q.label.toLowerCase().includes('room') ||
       q.label.toLowerCase().includes('housing')
     );
+    // Find Institution / Organization / School
+    const institutionQ = questions.find(q =>
+      q.label.toLowerCase().includes('institution') ||
+      q.label.toLowerCase().includes('school') ||
+      q.label.toLowerCase().includes('organization') ||
+      q.label.toLowerCase().includes('university') ||
+      q.label.toLowerCase().includes('college') ||
+      q.label.toLowerCase().includes('company') ||
+      q.label.toLowerCase().includes('affiliation')
+    );
 
     const fullName = String(formAnswers[nameQ?.id || ''] || 'Participant').trim();
     const email = String(formAnswers[emailQ?.id || ''] || '').trim();
     const phone = String(formAnswers[phoneQ?.id || ''] || '').trim();
     const gender = String(formAnswers[genderQ?.id || ''] || 'Prefer not to say');
+    const organization = (institutionQ ? String(formAnswers[institutionQ.id] || '') : fallbackInstitution).trim();
 
     let accommodationRequired = false;
     if (event.accommodationEnabled) {
@@ -109,7 +121,7 @@ export const PublicRegistrationModal: React.FC<PublicRegistrationModalProps> = (
 
     const result = db.registerParticipant(
       event.id,
-      { fullName, email, phone, gender, badgeType },
+      { fullName, email, phone, gender, organization: organization || undefined, badgeType },
       formAnswers,
       accommodationRequired
     );
@@ -382,6 +394,29 @@ export const PublicRegistrationModal: React.FC<PublicRegistrationModalProps> = (
                     )}
                   </div>
                 ))}
+
+                {/* Fallback Institution Field if questions do not include institution */}
+                {!questions.some(q =>
+                  q.label.toLowerCase().includes('institution') ||
+                  q.label.toLowerCase().includes('school') ||
+                  q.label.toLowerCase().includes('organization') ||
+                  q.label.toLowerCase().includes('university') ||
+                  q.label.toLowerCase().includes('college')
+                ) && (
+                  <div className="space-y-1">
+                    <label className="block text-xs font-semibold text-[#1C1C1A]">
+                      Institution / School / Organization
+                      <span className="text-[11px] font-normal text-[#8A8A85] ml-1">(Added to Badge)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={fallbackInstitution}
+                      onChange={e => setFallbackInstitution(e.target.value)}
+                      placeholder="e.g. University of Ghana, Achimota School"
+                      className="w-full h-9 px-3 text-xs rounded-md border border-[#E4E4E1] bg-white focus:outline-none focus:border-[#14595A]"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Submit Button */}

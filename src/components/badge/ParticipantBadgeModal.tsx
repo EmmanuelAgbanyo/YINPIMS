@@ -1,9 +1,9 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { toPng } from 'html-to-image';
 import type { Registration, Participant, Event, ParticipantBadgeType } from '../../types';
-import { X, Download, Printer, Copy, Check, ShieldCheck, Bed, Tag, ExternalLink } from 'lucide-react';
+import { X, Download, Printer, Copy, Check, ShieldCheck, Bed, Tag, ExternalLink, Building } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { db } from '../../services/db';
 import { getPassUrl } from '../../utils/qrUtils';
@@ -49,6 +49,29 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
   );
 
   if (!isOpen) return null;
+
+  // Derive effective institution from participant record or form answers
+  const effectiveInstitution = useMemo(() => {
+    if (participant.organization?.trim()) return participant.organization.trim();
+    if (!registration.responses) return '';
+    for (const [key, val] of Object.entries(registration.responses)) {
+      if (typeof val === 'string' && val.trim()) {
+        const q = data.questions.find(quest => quest.id === key);
+        const label = (q?.label || key).toLowerCase();
+        if (
+          label.includes('institution') ||
+          label.includes('school') ||
+          label.includes('organization') ||
+          label.includes('university') ||
+          label.includes('college') ||
+          label.includes('company')
+        ) {
+          return val.trim();
+        }
+      }
+    }
+    return '';
+  }, [participant.organization, registration.responses, data.questions]);
 
   // Find room details if assigned
   const room = registration.roomAssignmentId
@@ -247,18 +270,19 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
 
             {/* Badge Body */}
             <div className="p-6 text-center space-y-4 bg-white">
-              {/* Participant Name & Organization */}
+              {/* Participant Name & Organization / Institution */}
               <div>
                 <h2 className="font-heading font-bold text-xl text-[#1C1C1A] tracking-tight">
                   {participant.fullName}
                 </h2>
-                {participant.organization && (
-                  <p className="text-xs font-semibold text-[#14595A] mt-1">
-                    {participant.organization}
-                  </p>
+                {effectiveInstitution && (
+                  <div className="mt-1.5 inline-flex items-center justify-center space-x-1.5 px-3 py-1 bg-[#EBF4F4] text-[#14595A] rounded-full border border-[#14595A]/20" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                    <Building className="h-3.5 w-3.5 shrink-0" />
+                    <span className="text-xs font-bold uppercase tracking-wider">{effectiveInstitution}</span>
+                  </div>
                 )}
                 {participant.jobTitle && (
-                  <p className="text-[11px] text-[#6B6B66] mt-0.5">
+                  <p className="text-[11px] text-[#6B6B66] mt-1 font-medium">
                     {participant.jobTitle}
                   </p>
                 )}

@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { toPng } from 'html-to-image';
 import { useApp } from '../../context/AppContext';
@@ -144,6 +144,27 @@ export const PublicPassView: React.FC<PublicPassViewProps> = ({
   const badgeType = (registration?.badgeType || participant?.badgeType || 'Delegate') as ParticipantBadgeType;
   const theme = getBadgeTitleTheme(badgeType);
   const isCheckedIn = registration?.checkInStatus === 'Checked In';
+
+  // Extract institution / organization either from participant or custom registration responses
+  const effectiveInstitution = useMemo(() => {
+    if (participant?.organization?.trim()) return participant.organization.trim();
+    if (!registration?.responses) return '';
+    for (const [key, val] of Object.entries(registration.responses)) {
+      if (typeof val === 'string' && val.trim()) {
+        const lowerKey = key.toLowerCase();
+        if (
+          lowerKey.includes('institution') ||
+          lowerKey.includes('school') ||
+          lowerKey.includes('organization') ||
+          lowerKey.includes('university') ||
+          lowerKey.includes('college')
+        ) {
+          return val.trim();
+        }
+      }
+    }
+    return '';
+  }, [participant?.organization, registration?.responses]);
 
   // Check In / Undo Action
   const handlePerformCheckIn = (newStatus: boolean) => {
@@ -484,10 +505,10 @@ export const PublicPassView: React.FC<PublicPassViewProps> = ({
                       {participant.fullName}
                     </h2>
 
-                    {participant.organization && (
+                    {effectiveInstitution && (
                       <p className="text-xs sm:text-sm font-bold text-[#14595A] mt-1 inline-flex items-center justify-center space-x-1.5">
                         <Building className="h-4 w-4 shrink-0" />
-                        <span>{participant.organization}</span>
+                        <span>{effectiveInstitution}</span>
                       </p>
                     )}
 
@@ -581,6 +602,14 @@ export const PublicPassView: React.FC<PublicPassViewProps> = ({
                         <a href={`tel:${participant.phone}`} className="truncate hover:underline text-[#14595A] font-semibold font-mono">
                           {participant.phone}
                         </a>
+                      </div>
+                    )}
+
+                    {/* Institution / School */}
+                    {effectiveInstitution && (
+                      <div className="flex items-center space-x-2 text-[#1C1C1A]">
+                        <Building className="h-3.5 w-3.5 text-[#14595A] shrink-0" />
+                        <span className="font-semibold truncate">{effectiveInstitution}</span>
                       </div>
                     )}
 
