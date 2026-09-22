@@ -2,23 +2,27 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { db } from '../../services/db';
 import type { Participant, Registration, ParticipantBadgeType } from '../../types';
-import { X, Mail, Phone, Building, QrCode, Bed, Tag } from 'lucide-react';
+import { X, Mail, Phone, Building, QrCode, Bed, Tag, Pencil } from 'lucide-react';
 import { ParticipantBadgeModal, getBadgeTitleTheme } from '../badge/ParticipantBadgeModal';
 import { ConfirmationModal } from '../common/ConfirmationModal';
+import { EditParticipantModal } from './EditParticipantModal';
 
 interface ParticipantDetailDrawerProps {
   participant: Participant | null;
   onClose: () => void;
+  onEditParticipant?: (participant: Participant) => void;
 }
 
 export const ParticipantDetailDrawer: React.FC<ParticipantDetailDrawerProps> = ({
   participant,
   onClose,
+  onEditParticipant,
 }) => {
   const { data, refreshData } = useApp();
 
   const [activeBadgeReg, setActiveBadgeReg] = useState<Registration | null>(null);
   const [cancellingRegId, setCancellingRegId] = useState<string | null>(null);
+  const [isInternalEditOpen, setIsInternalEditOpen] = useState(false);
 
   if (!participant) return null;
 
@@ -51,18 +55,49 @@ export const ParticipantDetailDrawer: React.FC<ParticipantDetailDrawerProps> = (
             </h2>
             <p className="text-xs text-[#6B6B66]">ID: <code className="tabular-nums font-mono">{participant.id}</code></p>
           </div>
-          <button onClick={onClose} className="h-8 w-8 text-[#6B6B66] hover:bg-white rounded flex items-center justify-center cursor-pointer">
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => {
+                if (onEditParticipant) {
+                  onEditParticipant(participant);
+                } else {
+                  setIsInternalEditOpen(true);
+                }
+              }}
+              className="flex items-center space-x-1.5 px-3 py-1.5 bg-white border border-[#E4E4E1] hover:border-[#14595A] text-[#14595A] text-xs font-semibold rounded-xl transition-colors cursor-pointer shadow-2xs"
+              title="Edit this participant's profile"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              <span>Edit Info</span>
+            </button>
+            <button onClick={onClose} className="h-8 w-8 text-[#6B6B66] hover:bg-white rounded-lg flex items-center justify-center cursor-pointer transition-colors">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         {/* Drawer Content */}
         <div className="p-6 overflow-y-auto space-y-6 flex-1">
           {/* Profile Overview */}
           <div className="space-y-3">
-            <div>
-              <h3 className="text-lg font-bold text-[#1C1C1A] font-heading">{participant.fullName}</h3>
-              {participant.jobTitle && <p className="text-xs text-[#6B6B66] font-medium">{participant.jobTitle}</p>}
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-[#1C1C1A] font-heading">{participant.fullName}</h3>
+                {participant.jobTitle && <p className="text-xs text-[#6B6B66] font-medium">{participant.jobTitle}</p>}
+              </div>
+              <button
+                onClick={() => {
+                  if (onEditParticipant) {
+                    onEditParticipant(participant);
+                  } else {
+                    setIsInternalEditOpen(true);
+                  }
+                }}
+                className="text-xs font-semibold text-[#14595A] hover:underline flex items-center space-x-1 cursor-pointer pt-1"
+              >
+                <Pencil className="h-3 w-3" />
+                <span>Edit</span>
+              </button>
             </div>
 
             <div className="space-y-2 text-xs text-[#6B6B66]">
@@ -217,6 +252,13 @@ export const ParticipantDetailDrawer: React.FC<ParticipantDetailDrawerProps> = (
           onCancel={() => setCancellingRegId(null)}
           onConfirm={handleCancelConfirm}
           isDestructive={true}
+        />
+
+        {/* Edit Participant Modal Fallback */}
+        <EditParticipantModal
+          isOpen={isInternalEditOpen}
+          participant={participant}
+          onClose={() => setIsInternalEditOpen(false)}
         />
       </div>
     </div>

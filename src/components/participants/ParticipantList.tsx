@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { Participant } from '../../types';
-import { Search, UserPlus, ChevronRight, Printer, Download, FileSpreadsheet, FileJson, Calendar } from 'lucide-react';
+import { Search, UserPlus, ChevronRight, Printer, Download, FileSpreadsheet, FileJson, Calendar, Pencil } from 'lucide-react';
 import { ParticipantDetailDrawer } from './ParticipantDetailDrawer';
+import { EditParticipantModal } from './EditParticipantModal';
 import { BatchBadgePrintModal } from '../badge/BatchBadgePrintModal';
 import { exportParticipantsCSV, exportParticipantsJSON } from '../../utils/exportUtils';
 
@@ -18,6 +19,7 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ onRegisterNew,
   const [genderFilter, setGenderFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedParticipant, setSelectedParticipant] = useState<Participant | null>(null);
+  const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null);
   const [isBatchPrintOpen, setIsBatchPrintOpen] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
 
@@ -271,16 +273,30 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ onRegisterNew,
                       </td>
 
                       <td className="py-3.5 px-4 text-right">
-                        <button
-                          onClick={e => {
-                            e.stopPropagation();
-                            setSelectedParticipant(p);
-                          }}
-                          className="text-[#14595A] font-bold hover:underline inline-flex items-center space-x-1 cursor-pointer"
-                        >
-                          <span>Profile</span>
-                          <ChevronRight className="h-3.5 w-3.5" />
-                        </button>
+                        <div className="flex items-center justify-end space-x-1.5">
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              setEditingParticipant(p);
+                            }}
+                            className="px-2.5 py-1 text-xs font-semibold text-[#14595A] hover:bg-[#14595A]/10 rounded-lg inline-flex items-center space-x-1 cursor-pointer transition-colors border border-transparent hover:border-[#14595A]/20"
+                            title="Edit participant profile"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            <span>Edit</span>
+                          </button>
+
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              setSelectedParticipant(p);
+                            }}
+                            className="px-2.5 py-1 text-xs font-semibold text-[#6B6B66] hover:text-[#1C1C1A] hover:bg-[#FAFAF9] rounded-lg inline-flex items-center space-x-1 cursor-pointer transition-colors"
+                          >
+                            <span>Profile</span>
+                            <ChevronRight className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -300,6 +316,19 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ onRegisterNew,
       <ParticipantDetailDrawer
         participant={selectedParticipant}
         onClose={() => setSelectedParticipant(null)}
+        onEditParticipant={p => setEditingParticipant(p)}
+      />
+
+      {/* Edit Participant Information Modal */}
+      <EditParticipantModal
+        isOpen={!!editingParticipant}
+        participant={editingParticipant}
+        onClose={() => setEditingParticipant(null)}
+        onUpdated={updated => {
+          if (selectedParticipant?.id === updated.id) {
+            setSelectedParticipant(updated);
+          }
+        }}
       />
 
       {/* Batch Badge Printing Modal */}

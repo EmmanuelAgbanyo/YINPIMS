@@ -5,6 +5,7 @@ import { db } from '../../services/db';
 import type { Registration, Participant, ParticipantBadgeType, Event } from '../../types';
 import { BatchBadgePrintModal } from '../badge/BatchBadgePrintModal';
 import { ParticipantBadgeModal, getBadgeTitleTheme } from '../badge/ParticipantBadgeModal';
+import { EditParticipantModal } from '../participants/EditParticipantModal';
 import { extractPassIdentifier, playSuccessBeep, triggerHapticFeedback } from '../../utils/qrUtils';
 import {
   Search,
@@ -29,6 +30,7 @@ import {
   Building2,
   QrCode,
   BadgeAlert,
+  Pencil,
 } from 'lucide-react';
 
 interface CheckInViewProps {
@@ -56,6 +58,7 @@ export const CheckInView: React.FC<CheckInViewProps> = ({ filterEventId }) => {
   const [showCamera, setShowCamera] = useState(false);
   const [showWalkInModal, setShowWalkInModal] = useState(false);
   const [showBatchPrintModal, setShowBatchPrintModal] = useState(false);
+  const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null);
   const [badgeModalData, setBadgeModalData] = useState<{
     registration: Registration;
     participant: Participant;
@@ -877,6 +880,15 @@ export const CheckInView: React.FC<CheckInViewProps> = ({ filterEventId }) => {
                       <Tag className="h-3.5 w-3.5" />
                     </button>
 
+                    {/* Edit Attendee Details */}
+                    <button
+                      onClick={() => setEditingParticipant(participant)}
+                      className="h-9 px-2.5 text-xs font-semibold text-[#6B6B66] hover:text-[#14595A] bg-white border border-[#E4E4E1] rounded-lg hover:bg-[#FAFAF9] transition-colors cursor-pointer"
+                      title="Edit participant information"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+
                     {/* Main 1-Click Check In / Verified Button */}
                     {isCheckedIn ? (
                       <div className="flex items-center gap-1.5">
@@ -1150,6 +1162,13 @@ export const CheckInView: React.FC<CheckInViewProps> = ({ filterEventId }) => {
         isOpen={showBatchPrintModal}
         onClose={() => setShowBatchPrintModal(false)}
         initialEventId={activeEventId}
+      />
+
+      {/* Edit Attendee Details Modal */}
+      <EditParticipantModal
+        isOpen={!!editingParticipant}
+        participant={editingParticipant}
+        onClose={() => setEditingParticipant(null)}
       />
     </div>
   );

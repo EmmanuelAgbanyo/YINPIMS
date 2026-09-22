@@ -482,6 +482,56 @@ class StorageService {
     return this.data.registrations;
   }
 
+  public updateParticipant(
+    participantId: string,
+    updates: Partial<Omit<Participant, 'id' | 'createdAt'>>
+  ): Participant {
+    const pIndex = this.data.participants.findIndex(p => p.id === participantId);
+    if (pIndex === -1) {
+      throw new Error(`Participant with ID ${participantId} not found.`);
+    }
+
+    const current = this.data.participants[pIndex];
+    const updatedParticipant: Participant = {
+      ...current,
+      fullName: updates.fullName !== undefined ? updates.fullName.trim() : current.fullName,
+      email: updates.email !== undefined ? updates.email.trim().toLowerCase() : current.email,
+      phone: updates.phone !== undefined ? updates.phone.trim() : current.phone,
+      gender: updates.gender !== undefined ? updates.gender : current.gender,
+      badgeType: updates.badgeType !== undefined ? updates.badgeType : current.badgeType,
+      organization: updates.organization !== undefined ? updates.organization.trim() : current.organization,
+      jobTitle: updates.jobTitle !== undefined ? updates.jobTitle.trim() : current.jobTitle,
+    };
+
+    this.data.participants[pIndex] = updatedParticipant;
+
+    // Synchronize registrations if badgeType or name changed
+    let regsChanged = false;
+    if (updates.badgeType) {
+      this.data.registrations = this.data.registrations.map(r => {
+        if (r.participantId === participantId) {
+          regsChanged = true;
+          return {
+            ...r,
+            badgeType: updates.badgeType,
+          };
+        }
+        return r;
+      });
+    }
+
+    this.saveToStorage(this.data);
+    syncParticipantToFirestore(updatedParticipant);
+
+    if (regsChanged) {
+      this.data.registrations
+        .filter(r => r.participantId === participantId)
+        .forEach(r => syncRegistrationToFirestore(r));
+    }
+
+    return updatedParticipant;
+  }
+
   public registerParticipant(
     eventId: string,
     participantData: { fullName: string; email: string; phone: string; gender: string; organization?: string; jobTitle?: string; badgeType?: ParticipantBadgeType },
