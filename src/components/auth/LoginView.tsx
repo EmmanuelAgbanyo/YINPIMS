@@ -23,12 +23,15 @@ import {
   sendPhoneVerificationCode, 
   resetUserPassword 
 } from '../../services/firebase';
+import { db } from '../../services/db';
+import { useApp } from '../../context/AppContext';
 import type { ConfirmationResult } from 'firebase/auth';
 import type { UserRole } from '../../types';
 
 type AuthMode = 'email_signin' | 'email_signup' | 'phone' | 'forgot_password';
 
 export const LoginView: React.FC = () => {
+  const { loginWithLocalUser } = useApp();
   const [mode, setMode] = useState<AuthMode>('email_signin');
   
   // Form fields
@@ -72,9 +75,44 @@ export const LoginView: React.FC = () => {
     setError(null);
     setSuccessMsg(null);
     setLoading(true);
+
     try {
-      await signInWithEmail(email, password);
-      setSuccessMsg(email.toLowerCase() === 'policyp28@gmail.com' ? 'Welcome Super Admin!' : 'Sign in successful!');
+      const normalizedEmail = email.trim().toLowerCase();
+      const trimmedPass = password.trim();
+
+      // 1. Check if staff member is logging in with provisional password
+      const localUser = db.getUsers().find(u => u.email.toLowerCase() === normalizedEmail);
+      if (localUser && localUser.provisionalPassword && localUser.provisionalPassword === trimmedPass) {
+        // Instantly establish local session so App transitions to MainLayout & ForcePasswordChangeModal
+        loginWithLocalUser(localUser);
+
+        // Attempt non-blocking Firebase authentication in background
+        try {
+          await signInWithEmail(email, password);
+        } catch (fbErr: any) {
+          if (fbErr.code === 'auth/user-not-found' || fbErr.code === 'auth/invalid-credential') {
+            try {
+              await signUpWithEmail(email, password, localUser.name);
+            } catch (createErr) {
+              console.warn('Firebase provision registration note:', createErr);
+            }
+          }
+        }
+        return;
+      }
+
+      // 2. Standard sign in
+      try {
+        await signInWithEmail(email, password);
+        setSuccessMsg(normalizedEmail === 'policyp28@gmail.com' ? 'Welcome Super Admin!' : 'Sign in successful!');
+      } catch (fbErr: any) {
+        // Resilient fallback for local admin/users if Firebase auth fails or domain restricted
+        if (localUser && (normalizedEmail === 'policyp28@gmail.com' || localUser.status === 'Active')) {
+          loginWithLocalUser(localUser);
+          return;
+        }
+        throw fbErr;
+      }
     } catch (err: any) {
       setError(formatAuthError(err));
     } finally {

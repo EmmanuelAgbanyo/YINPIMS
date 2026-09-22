@@ -4,7 +4,7 @@ import type { DatabaseSchema } from '../services/db';
 import type { User, UserRole, Event } from '../types';
 import { syncService } from '../services/sync';
 import type { SyncStatus, SyncConfig } from '../services/sync';
-import { onAuthUserChange } from '../services/firebase';
+import { onAuthUserChange, logoutUser } from '../services/firebase';
 import type { User as FirebaseUser } from 'firebase/auth';
 
 const SUPERADMIN_EMAIL = 'policyp28@gmail.com';
@@ -12,6 +12,9 @@ const SUPERADMIN_EMAIL = 'policyp28@gmail.com';
 interface AppContextType {
   data: DatabaseSchema;
   currentUser: User;
+  effectiveUser: User;
+  impersonatedUser: User | null;
+  sessionUser: User | null;
   activeRole: UserRole;
   selectedEventId: string; // 'all' or eventId
   selectedEvent: Event | null;
@@ -27,6 +30,12 @@ interface AppContextType {
   setCurrentUserRole: (role: UserRole) => void;
   setSelectedEventId: (id: string) => void;
   resetDatabase: () => void;
+  startImpersonation: (user: User) => void;
+  stopImpersonation: () => void;
+  completePasswordReset: (newPassword: string) => void;
+  issueProvisionalPassword: (userId: string, customPassword?: string) => { user: User; provisionalPassword: string };
+  loginWithLocalUser: (user: User) => void;
+  logout: () => Promise<void>;
   hasPermission: (action: 'manage_org' | 'manage_staff' | 'create_event' | 'delete_event' | 'manage_forms' | 'check_in' | 'manage_accommodation') => boolean;
 }
 
@@ -34,23 +43,50 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [data, setData] = useState<DatabaseSchema>(db.getData());
-  const [currentUser, setCurrentUser] = useState<User>(data.users[0] || {
-    id: 'usr-admin',
-    name: 'Super Admin',
-    email: SUPERADMIN_EMAIL,
-    phone: '',
-    role: 'ADMIN',
-    organizationId: 'org-001',
-    assignedEvents: ['*'],
-    status: 'Active',
+
+  const getInitialSessionUser = (): User | null => {
+    try {
+      const stored = localStorage.getItem('PIMS_SESSION_USER');
+      if (stored) return JSON.parse(stored);
+    } catch (e) {
+      console.warn('Failed to parse PIMS_SESSION_USER', e);
+    }
+    return null;
+  };
+
+  const [sessionUser, setSessionUser] = useState<User | null>(getInitialSessionUser);
+
+  const [currentUser, setCurrentUser] = useState<User>(() => {
+    const initialSession = getInitialSessionUser();
+    if (initialSession) return initialSession;
+    return data.users[0] || {
+      id: 'usr-admin',
+      name: 'Super Admin',
+      email: SUPERADMIN_EMAIL,
+      phone: '',
+      role: 'ADMIN',
+      organizationId: 'org-001',
+      assignedEvents: ['*'],
+      status: 'Active',
+    };
   });
+  const [impersonatedUser, setImpersonatedUser] = useState<User | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string>('all');
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(syncService.getStatus());
   const [syncConfig, setSyncConfig] = useState<SyncConfig>(syncService.getConfig());
   const [isSyncModalOpen, setIsSyncModalOpen] = useState<boolean>(false);
 
+  const effectiveUser = impersonatedUser || currentUser;
+
   const refreshData = () => {
-    setData({ ...db.getData() });
+    const latestData = db.getData();
+    setData({ ...latestData });
+
+    // Sync updated currentUser from db if exists
+    const updatedCur = latestData.users.find(u => u.id === currentUser.id || u.email.toLowerCase() === currentUser.email.toLowerCase());
+    if (updatedCur) {
+      setCurrentUser(updatedCur);
+    }
   };
 
   useEffect(() => {
@@ -58,17 +94,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubscribeAuth = onAuthUserChange((fbUser: FirebaseUser | null) => {
       if (fbUser) {
         const isSuperAdmin = fbUser.email?.toLowerCase() === SUPERADMIN_EMAIL.toLowerCase();
-        setCurrentUser({
+        const existingLocalUser = db.getUsers().find(u => u.email.toLowerCase() === fbUser.email?.toLowerCase());
+
+        const activeUser: User = {
           id: fbUser.uid,
-          name: fbUser.displayName || (isSuperAdmin ? 'Super Admin' : fbUser.email || 'Authorized User'),
+          name: existingLocalUser?.name || fbUser.displayName || (isSuperAdmin ? 'Super Admin' : fbUser.email || 'Authorized User'),
           email: fbUser.email || '',
-          phone: fbUser.phoneNumber || '',
-          role: isSuperAdmin ? 'ADMIN' : 'ADMIN', // Default authenticated users to ADMIN unless role simulator is used
+          phone: fbUser.phoneNumber || existingLocalUser?.phone || '',
+          role: existingLocalUser?.role || (isSuperAdmin ? 'ADMIN' : 'ADMIN'),
           organizationId: 'org-001',
-          assignedEvents: ['*'],
-          status: 'Active',
-          avatarUrl: fbUser.photoURL || undefined,
-        });
+          assignedEvents: existingLocalUser?.assignedEvents || ['*'],
+          status: existingLocalUser?.status || 'Active',
+          avatarUrl: fbUser.photoURL || existingLocalUser?.avatarUrl,
+          mustChangePassword: existingLocalUser?.mustChangePassword || false,
+          provisionalPassword: existingLocalUser?.provisionalPassword,
+        };
+
+        setCurrentUser(activeUser);
+        setSessionUser(activeUser);
+        localStorage.setItem('PIMS_SESSION_USER', JSON.stringify(activeUser));
       }
     });
 
@@ -121,10 +165,62 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCurrentUser(matchingUser);
   };
 
+  const startImpersonation = (user: User) => {
+    setImpersonatedUser(user);
+  };
+
+  const stopImpersonation = () => {
+    setImpersonatedUser(null);
+  };
+
+  const completePasswordReset = (newPassword: string) => {
+    const updated = db.updateUserPassword(currentUser.id, newPassword);
+    setCurrentUser(updated);
+    setSessionUser(updated);
+    localStorage.setItem('PIMS_SESSION_USER', JSON.stringify(updated));
+    refreshData();
+  };
+
+  const issueProvisionalPassword = (userId: string, customPassword?: string) => {
+    const res = db.issueProvisionalPassword(userId, customPassword);
+    refreshData();
+    return res;
+  };
+
+  const loginWithLocalUser = (user: User) => {
+    setCurrentUser(user);
+    setSessionUser(user);
+    localStorage.setItem('PIMS_SESSION_USER', JSON.stringify(user));
+    refreshData();
+  };
+
+  const logout = async () => {
+    setSessionUser(null);
+    localStorage.removeItem('PIMS_SESSION_USER');
+    setImpersonatedUser(null);
+    try {
+      await logoutUser();
+    } catch (e) {
+      console.warn('Logout note:', e);
+    }
+    const defaultAdmin = data.users[0] || {
+      id: 'usr-admin',
+      name: 'Super Admin',
+      email: SUPERADMIN_EMAIL,
+      phone: '',
+      role: 'ADMIN',
+      organizationId: 'org-001',
+      assignedEvents: ['*'],
+      status: 'Active',
+    };
+    setCurrentUser(defaultAdmin);
+  };
+
   const resetDatabase = () => {
     const res = db.resetToSeed();
     setData({ ...res });
     setCurrentUser(res.users[0]);
+    setImpersonatedUser(null);
     setSelectedEventId('all');
   };
 
@@ -132,9 +228,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     ? null
     : data.events.find(e => e.id === selectedEventId) || null;
 
-  // Permission Matrix
+  // Permission Matrix based on effectiveUser
   const hasPermission = (action: 'manage_org' | 'manage_staff' | 'create_event' | 'delete_event' | 'manage_forms' | 'check_in' | 'manage_accommodation'): boolean => {
-    const role = currentUser.role;
+    const role = effectiveUser.role;
     switch (action) {
       case 'manage_org':
       case 'manage_staff':
@@ -156,7 +252,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       value={{
         data,
         currentUser,
-        activeRole: currentUser.role,
+        effectiveUser,
+        impersonatedUser,
+        activeRole: effectiveUser.role,
         selectedEventId,
         selectedEvent,
         syncStatus,
@@ -171,6 +269,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCurrentUserRole,
         setSelectedEventId,
         resetDatabase,
+        startImpersonation,
+        stopImpersonation,
+        completePasswordReset,
+        issueProvisionalPassword,
+        sessionUser,
+        loginWithLocalUser,
+        logout,
         hasPermission,
       }}
     >

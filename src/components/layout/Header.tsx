@@ -14,6 +14,7 @@ import {
   WifiOff,
   Radio,
   LogIn,
+  LogOut,
 } from 'lucide-react';
 import { auth, onAuthUserChange } from '../../services/firebase';
 import type { User as FirebaseUser } from 'firebase/auth';
@@ -44,7 +45,9 @@ export const Header: React.FC<HeaderProps> = ({
 
   const {
     data,
-    currentUser,
+    effectiveUser,
+    impersonatedUser,
+    stopImpersonation,
     activeRole,
     selectedEventId,
     setCurrentUserRole,
@@ -53,11 +56,12 @@ export const Header: React.FC<HeaderProps> = ({
     syncStatus,
     syncConfig,
     setIsSyncModalOpen,
+    logout,
   } = useApp();
 
   const authorizedEvents = data.events.filter(e => {
-    if (!currentUser?.assignedEvents || currentUser.assignedEvents.includes('*')) return true;
-    return currentUser.assignedEvents.includes(e.id);
+    if (!effectiveUser?.assignedEvents || effectiveUser.assignedEvents.includes('*')) return true;
+    return effectiveUser.assignedEvents.includes(e.id);
   });
 
   const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -69,7 +73,27 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-[#E4E4E1] bg-white px-3 sm:px-6 shadow-2xs">
+    <div className="sticky top-0 z-30 flex flex-col w-full">
+      {/* Superadmin Impersonation Support Mode Banner */}
+      {impersonatedUser && (
+        <div className="bg-gradient-to-r from-amber-600 via-amber-700 to-amber-800 text-white px-4 py-2 flex items-center justify-between text-xs font-medium shadow-md">
+          <div className="flex items-center space-x-2">
+            <UserCheck className="h-4 w-4 text-amber-200 animate-pulse" />
+            <span>
+              <strong>Superadmin Support Mode:</strong> Viewing portal as staff member{' '}
+              <span className="underline font-bold">{impersonatedUser.name}</span> ({impersonatedUser.email}) — Scope: {impersonatedUser.role}
+            </span>
+          </div>
+          <button
+            onClick={stopImpersonation}
+            className="px-3 py-1 bg-white text-amber-900 rounded-lg font-bold text-[11px] hover:bg-amber-100 transition-colors cursor-pointer flex items-center space-x-1 shadow-2xs"
+          >
+            <span>Exit Support Mode</span>
+          </button>
+        </div>
+      )}
+
+      <header className="flex h-16 w-full items-center justify-between border-b border-[#E4E4E1] bg-white px-3 sm:px-6 shadow-2xs">
       {/* Left section: Mobile Drawer Toggle, App Brand & Scope Selector */}
       <div className="flex items-center space-x-3">
         {/* Mobile Menu Hamburger */}
@@ -227,7 +251,18 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <RotateCcw className="h-4 w-4" />
         </button>
+
+        {/* Sign Out Button */}
+        <button
+          onClick={logout}
+          title="Sign Out of Portal"
+          className="flex h-9 items-center space-x-1.5 rounded-md border border-[#E4E4E1] bg-white text-[#6B6B66] hover:bg-red-50 hover:text-red-600 hover:border-red-200 px-2.5 text-xs font-semibold transition-colors cursor-pointer"
+        >
+          <LogOut className="h-3.5 w-3.5" />
+          <span className="hidden lg:inline">Sign Out</span>
+        </button>
       </div>
     </header>
+  </div>
   );
 };

@@ -23,13 +23,14 @@ import { CommunicationModal } from './components/communications/CommunicationMod
 import { ExportModal } from './components/reports/ExportModal';
 import { CloudSyncModal } from './components/common/CloudSyncModal';
 import { AuthModal } from './components/auth/AuthModal';
+import { ForcePasswordChangeModal } from './components/auth/ForcePasswordChangeModal';
 import { LoginView } from './components/auth/LoginView';
 import { auth, onAuthUserChange } from './services/firebase';
 import type { User as FirebaseUser } from 'firebase/auth';
 import type { Event } from './types';
 
 const MainLayout: React.FC = () => {
-  const { activeRole } = useApp();
+  const { activeRole, sessionUser } = useApp();
   const [activeTab, setActiveTab] = useState<NavTab>('overview');
 
   // Firebase Auth State Guard
@@ -93,8 +94,8 @@ const MainLayout: React.FC = () => {
     );
   }
 
-  // If user is not authenticated, show full-screen LoginView
-  if (!authUser) {
+  // If user is not authenticated (neither Firebase nor local session), show full-screen LoginView
+  if (!authUser && !sessionUser) {
     return <LoginView />;
   }
 
@@ -243,6 +244,9 @@ const MainLayout: React.FC = () => {
 
       {/* Cross-Device Multi-Device Cloud Sync Modal */}
       <CloudSyncModal />
+
+      {/* Mandatory First-Login Password Recreation Modal */}
+      <ForcePasswordChangeModal />
     </div>
   );
 };

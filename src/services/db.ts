@@ -155,6 +155,9 @@ class StorageService {
   public saveUser(userData: Partial<User> & { name: string; email: string }): User {
     const isNew = !userData.id;
     const userId = userData.id || `usr-${Date.now()}`;
+    const existing = this.data.users.find(u => u.id === userId);
+    const now = new Date().toISOString();
+
     const newUser: User = {
       id: userId,
       name: userData.name,
@@ -164,7 +167,12 @@ class StorageService {
       organizationId: userData.organizationId || 'org-001',
       assignedEvents: userData.assignedEvents || ['*'],
       status: userData.status || 'Active',
-      avatarUrl: userData.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+      avatarUrl: userData.avatarUrl || existing?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+      provisionalPassword: userData.provisionalPassword !== undefined ? userData.provisionalPassword : existing?.provisionalPassword,
+      mustChangePassword: userData.mustChangePassword !== undefined ? userData.mustChangePassword : (isNew ? true : existing?.mustChangePassword),
+      passwordSetAt: userData.passwordSetAt || existing?.passwordSetAt,
+      lastLoginAt: userData.lastLoginAt || existing?.lastLoginAt,
+      createdAt: existing?.createdAt || now,
     };
 
     let users = [...this.data.users];
@@ -176,6 +184,50 @@ class StorageService {
 
     this.saveToStorage({ ...this.data, users });
     return newUser;
+  }
+
+  public issueProvisionalPassword(userId: string, customPassword?: string): { user: User; provisionalPassword: string } {
+    const user = this.data.users.find(u => u.id === userId);
+    if (!user) throw new Error('User not found.');
+
+    const generatePass = () => {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let res = 'YIN-';
+      for (let i = 0; i < 6; i++) {
+        res += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return res;
+    };
+
+    const provPass = customPassword && customPassword.trim() ? customPassword.trim() : generatePass();
+    const updatedUser: User = {
+      ...user,
+      provisionalPassword: provPass,
+      mustChangePassword: true,
+    };
+
+    const users = this.data.users.map(u => u.id === userId ? updatedUser : u);
+    this.saveToStorage({ ...this.data, users });
+
+    return { user: updatedUser, provisionalPassword: provPass };
+  }
+
+  public updateUserPassword(userId: string, _newPassword?: string): User {
+    const user = this.data.users.find(u => u.id === userId);
+    if (!user) throw new Error('User not found.');
+
+    const now = new Date().toISOString();
+    const updatedUser: User = {
+      ...user,
+      provisionalPassword: undefined,
+      mustChangePassword: false,
+      passwordSetAt: now,
+    };
+
+    const users = this.data.users.map(u => u.id === userId ? updatedUser : u);
+    this.saveToStorage({ ...this.data, users });
+
+    return updatedUser;
   }
 
   public deleteUser(userId: string): void {

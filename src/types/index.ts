@@ -10,6 +10,11 @@ export interface User {
   assignedEvents: string[]; // event IDs ('*' for all)
   status: 'Active' | 'Inactive';
   avatarUrl?: string;
+  provisionalPassword?: string;
+  mustChangePassword?: boolean;
+  passwordSetAt?: string;
+  lastLoginAt?: string;
+  createdAt?: string;
 }
 
 export interface Organization {
