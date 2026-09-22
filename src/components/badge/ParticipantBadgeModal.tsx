@@ -1,4 +1,5 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { toPng } from 'html-to-image';
 import type { Registration, Participant, Event, ParticipantBadgeType } from '../../types';
@@ -99,11 +100,33 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
-  return (
-    <div className="single-badge-modal-root fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto font-body">
+  // Track modal open state on body to isolate during printing
+  useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add('single-badge-modal-active');
+      return () => {
+        document.body.classList.remove('single-badge-modal-active');
+      };
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  return createPortal(
+    <div className="single-badge-print-portal single-badge-modal-root fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto font-body">
       {/* Print stylesheet for single badge printing */}
       <style>{`
         @media print {
+          /* Complete isolation: hide all elements attached to body except our print portal */
+          body > *:not(.single-badge-print-portal) {
+            display: none !important;
+            visibility: hidden !important;
+          }
+
+          body.single-badge-modal-active > #root {
+            display: none !important;
+          }
+
           @page {
             size: auto;
             margin: 8mm;
@@ -121,7 +144,9 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
             padding: 0 !important;
             overflow: visible !important;
           }
+          .single-badge-print-portal,
           .single-badge-modal-root {
+            display: block !important;
             background: #FFFFFF !important;
             background-color: #FFFFFF !important;
             position: static !important;
@@ -339,6 +364,7 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

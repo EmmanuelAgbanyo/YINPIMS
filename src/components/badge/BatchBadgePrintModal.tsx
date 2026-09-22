@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { useApp } from '../../context/AppContext';
 import { getPassUrl } from '../../utils/qrUtils';
@@ -28,6 +29,16 @@ export const BatchBadgePrintModal: React.FC<BatchBadgePrintModalProps> = ({
   initialEventId,
 }) => {
   const { data, selectedEventId } = useApp();
+
+  // Track modal open state on body to isolate during printing
+  useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add('batch-badge-modal-active');
+      return () => {
+        document.body.classList.remove('batch-badge-modal-active');
+      };
+    }
+  }, [isOpen]);
 
   const effectiveEventId = initialEventId || (selectedEventId !== 'all' ? selectedEventId : 'all');
 
@@ -117,20 +128,32 @@ export const BatchBadgePrintModal: React.FC<BatchBadgePrintModalProps> = ({
     window.print();
   };
 
-  return (
-    <div className="batch-print-modal-root fixed inset-0 z-50 flex flex-col bg-black/60 backdrop-blur-xs overflow-hidden">
+  return createPortal(
+    <div className="batch-print-portal batch-print-modal-root fixed inset-0 z-50 flex flex-col bg-black/60 backdrop-blur-xs overflow-hidden">
       {/* Dynamic CSS for Print Layout */}
       <style>{`
         @media print {
+          /* Complete isolation: hide all elements attached to body except our print portal */
+          body > *:not(.batch-print-portal) {
+            display: none !important;
+            visibility: hidden !important;
+          }
+
+          body.batch-badge-modal-active > #root {
+            display: none !important;
+          }
+
           @page {
             size: A4 portrait;
             margin: 6mm 6mm;
           }
+
           *, *::before, *::after {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
             color-adjust: exact !important;
           }
+
           html, body {
             background: #FFFFFF !important;
             background-color: #FFFFFF !important;
@@ -145,13 +168,15 @@ export const BatchBadgePrintModal: React.FC<BatchBadgePrintModalProps> = ({
           }
 
           /* Force all modal wrappers, backdrops, and containers to pure white */
+          .batch-print-portal,
           .batch-print-modal-root,
           .batch-print-workspace,
           .print-container {
-            background: #FFFFFF !important;
-            background-color: #FFFFFF !important;
+            display: block !important;
             position: static !important;
             inset: auto !important;
+            background: #FFFFFF !important;
+            background-color: #FFFFFF !important;
             width: 100% !important;
             height: auto !important;
             min-height: 0 !important;
@@ -170,17 +195,21 @@ export const BatchBadgePrintModal: React.FC<BatchBadgePrintModalProps> = ({
             display: none !important;
           }
 
-          /* Page wrapper for strict A4 pagination without bleed */
+          /* Page wrapper for strict A4 pagination without bleed or split */
           .a4-page-wrapper {
             display: block !important;
+            width: 198mm !important;
+            max-width: 198mm !important;
+            height: 278mm !important;
+            max-height: 278mm !important;
+            margin: 0 auto !important;
+            padding: 0 !important;
             page-break-before: auto !important;
             page-break-after: always !important;
             break-after: page !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
-            margin: 0 auto !important;
-            padding: 0 !important;
-            width: 100% !important;
+            overflow: hidden !important;
             background: #FFFFFF !important;
             background-color: #FFFFFF !important;
           }
@@ -192,12 +221,12 @@ export const BatchBadgePrintModal: React.FC<BatchBadgePrintModalProps> = ({
 
           /* Exactly 1 A4 printable grid per sheet: 2x2 layout */
           .a4-print-page {
-            width: 196mm !important;
-            max-width: 196mm !important;
-            height: 280mm !important;
-            max-height: 280mm !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            height: 100% !important;
+            max-height: 100% !important;
             min-height: 0 !important;
-            margin: 0 auto !important;
+            margin: 0 !important;
             padding: 2mm !important;
             box-sizing: border-box !important;
             display: grid !important;
@@ -224,13 +253,13 @@ export const BatchBadgePrintModal: React.FC<BatchBadgePrintModalProps> = ({
             background: #FFFFFF !important;
             background-color: #FFFFFF !important;
             height: 100% !important;
-            max-height: 136mm !important;
+            max-height: 135mm !important;
             box-sizing: border-box !important;
             display: flex !important;
             flex-direction: column !important;
             justify-content: space-between !important;
             overflow: hidden !important;
-            padding: 8px !important;
+            padding: 6px 8px !important;
           }
 
           .empty-badge-cell {
@@ -425,7 +454,7 @@ export const BatchBadgePrintModal: React.FC<BatchBadgePrintModalProps> = ({
                 </div>
 
                 {/* A4 Sheet Paper Mockup Container */}
-                <div className="a4-print-page bg-white border border-[#E4E4E1] shadow-2xl rounded-sm p-4 w-[210mm] max-w-full min-h-[285mm] print:min-h-0 print:w-auto print:shadow-none print:border-none grid grid-cols-2 grid-rows-2 gap-4 box-sizing-border font-body text-[#1C1C1A]">
+                <div className="a4-print-page bg-white border border-[#E4E4E1] shadow-2xl rounded-sm p-4 w-[210mm] max-w-full grid grid-cols-2 grid-rows-2 gap-4 box-sizing-border font-body text-[#1C1C1A]">
                   {pageItems.map(({ reg, participant, event, room }) => (
                     <div
                       key={reg.id}
@@ -540,6 +569,7 @@ export const BatchBadgePrintModal: React.FC<BatchBadgePrintModalProps> = ({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

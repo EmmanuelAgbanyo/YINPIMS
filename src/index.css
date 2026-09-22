@@ -49,6 +49,12 @@
     print-color-adjust: exact !important;
     color-adjust: exact !important;
   }
+
+  body.batch-badge-modal-active > #root,
+  body.single-badge-modal-active > #root {
+    display: none !important;
+    visibility: hidden !important;
+  }
 }
 
 /* Custom scrollbar for clean operational feel */
