@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import type { UserRole } from '../../types';
 import {
   Shield,
+  ShieldCheck,
   ChevronDown,
   RotateCcw,
   Calendar,
@@ -45,12 +45,11 @@ export const Header: React.FC<HeaderProps> = ({
 
   const {
     data,
+    currentUser,
     effectiveUser,
     impersonatedUser,
     stopImpersonation,
-    activeRole,
     selectedEventId,
-    setCurrentUserRole,
     setSelectedEventId,
     resetDatabase,
     syncStatus,
@@ -63,10 +62,6 @@ export const Header: React.FC<HeaderProps> = ({
     if (!effectiveUser?.assignedEvents || effectiveUser.assignedEvents.includes('*')) return true;
     return effectiveUser.assignedEvents.includes(e.id);
   });
-
-  const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setCurrentUserRole(e.target.value as UserRole);
-  };
 
   const handleEventChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedEventId(e.target.value);
@@ -224,20 +219,18 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </button>
 
-        {/* Role Simulator Dropdown */}
-        <div className="flex items-center space-x-1 rounded-md border border-[#E4E4E1] bg-[#FAFAF9] p-1">
-          <Shield className="h-3.5 w-3.5 text-[#14595A] ml-1 shrink-0" />
-          <select
-            value={activeRole}
-            onChange={handleRoleChange}
-            className="h-7 rounded border-0 bg-transparent px-1 text-xs font-bold text-[#14595A] focus:outline-none cursor-pointer"
-            title="Switch User Role to test permissions"
-          >
-            <option value="ADMIN">Admin</option>
-            <option value="EVENT_COORDINATOR">Coordinator</option>
-            <option value="CHECKIN_STAFF">Staff</option>
-          </select>
-        </div>
+        {/* User Role Badge */}
+        {currentUser.email?.toLowerCase().trim() === 'policyp28@gmail.com' ? (
+          <div className="flex items-center space-x-1.5 rounded-md border border-[#14595A]/30 bg-[#EBF4F4] px-2.5 py-1 text-xs font-bold text-[#14595A] shadow-2xs">
+            <ShieldCheck className="h-4 w-4 text-[#14595A] shrink-0" />
+            <span>Super Admin</span>
+          </div>
+        ) : (
+          <div className="flex items-center space-x-1 rounded-md border border-[#E4E4E1] bg-[#FAFAF9] px-2.5 py-1 text-xs font-bold text-[#14595A]">
+            <Shield className="h-3.5 w-3.5 text-[#14595A] shrink-0" />
+            <span>{effectiveUser.role === 'ADMIN' ? 'Admin' : effectiveUser.role === 'EVENT_COORDINATOR' ? 'Coordinator' : 'Staff'}</span>
+          </div>
+        )}
 
         {/* Reset Demo Data Button */}
         <button

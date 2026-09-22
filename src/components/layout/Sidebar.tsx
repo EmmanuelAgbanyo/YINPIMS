@@ -103,6 +103,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {navGroups.map((group, groupIdx) => {
           // Filter items by permission
           const visibleItems = group.items.filter(item => {
+            const isSuperAdmin = currentUser.email?.toLowerCase().trim() === 'policyp28@gmail.com';
+            if (isSuperAdmin) return true;
             if (item.adminOnly && currentUser.role !== 'ADMIN') return false;
             if (item.permissionKey && !hasPermission(item.permissionKey)) return false;
             return true;

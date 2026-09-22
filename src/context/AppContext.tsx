@@ -70,7 +70,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const getInitialSessionUser = (): User | null => {
     try {
       const stored = localStorage.getItem('PIMS_SESSION_USER');
-      if (stored) return JSON.parse(stored);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.email?.toLowerCase().trim() === SUPERADMIN_EMAIL.toLowerCase()) {
+          parsed.role = 'ADMIN';
+          parsed.assignedEvents = ['*'];
+        }
+        return parsed;
+      }
     } catch (e) {
       console.warn('Failed to parse PIMS_SESSION_USER', e);
     }
@@ -81,7 +88,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [currentUser, setCurrentUser] = useState<User>(() => {
     const initialSession = getInitialSessionUser();
-    if (initialSession) return initialSession;
+    if (initialSession) {
+      if (initialSession.email?.toLowerCase().trim() === SUPERADMIN_EMAIL.toLowerCase()) {
+        initialSession.role = 'ADMIN';
+        initialSession.assignedEvents = ['*'];
+      }
+      return initialSession;
+    }
     return data.users[0] || {
       id: 'usr-admin',
       name: 'Super Admin',
@@ -120,16 +133,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (fbUser) {
         const normalizedEmail = (fbUser.email || '').toLowerCase().trim();
         const isSuperAdmin = normalizedEmail === SUPERADMIN_EMAIL.toLowerCase();
-        let existingLocalUser = db.getUsers().find(u => u.email.toLowerCase() === normalizedEmail);
+        let existingLocalUser = db.getUsers().find(u => u.email.toLowerCase().trim() === normalizedEmail);
 
-        // Auto-register Google users who do not exist in local database
-        if (!existingLocalUser) {
+        if (isSuperAdmin) {
+          existingLocalUser = {
+            ...(existingLocalUser || {}),
+            id: existingLocalUser?.id || fbUser.uid,
+            name: fbUser.displayName || existingLocalUser?.name || 'Super Admin',
+            email: normalizedEmail,
+            phone: fbUser.phoneNumber || existingLocalUser?.phone || '',
+            role: 'ADMIN',
+            organizationId: 'org-001',
+            assignedEvents: ['*'],
+            status: 'Active',
+            avatarUrl: fbUser.photoURL || existingLocalUser?.avatarUrl,
+            createdAt: existingLocalUser?.createdAt || new Date().toISOString(),
+          };
+          db.saveUser(existingLocalUser);
+        } else if (!existingLocalUser) {
           existingLocalUser = db.saveUser({
             id: fbUser.uid,
             name: fbUser.displayName || normalizedEmail.split('@')[0] || 'Google User',
             email: normalizedEmail,
             phone: fbUser.phoneNumber || '',
-            role: isSuperAdmin ? 'ADMIN' : 'CHECKIN_STAFF',
+            role: 'CHECKIN_STAFF',
             organizationId: 'org-001',
             assignedEvents: ['*'],
             status: 'Active',
@@ -145,9 +172,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             name: existingLocalUser.name,
             email: existingLocalUser.email,
             phone: existingLocalUser.phone || '',
-            role: existingLocalUser.role,
+            role: isSuperAdmin ? 'ADMIN' : existingLocalUser.role,
             organizationId: 'org-001',
-            assignedEvents: existingLocalUser.assignedEvents || ['*'],
+            assignedEvents: isSuperAdmin ? ['*'] : (existingLocalUser.assignedEvents || ['*']),
             status: existingLocalUser.status || 'Active',
             avatarUrl: existingLocalUser.avatarUrl || fbUser.photoURL || '',
             lastLoginAt: new Date().toISOString(),
@@ -158,6 +185,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         const activeUser: User = {
           ...existingLocalUser,
+          role: isSuperAdmin ? 'ADMIN' : existingLocalUser.role,
+          assignedEvents: isSuperAdmin ? ['*'] : (existingLocalUser.assignedEvents || ['*']),
           avatarUrl: fbUser.photoURL || existingLocalUser.avatarUrl,
         };
 
@@ -506,6 +535,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Permission Matrix based on effectiveUser
   const hasPermission = (action: 'manage_org' | 'manage_staff' | 'create_event' | 'delete_event' | 'manage_forms' | 'check_in' | 'manage_accommodation'): boolean => {
+    if (
+      currentUser.email?.toLowerCase().trim() === SUPERADMIN_EMAIL.toLowerCase() ||
+      effectiveUser.email?.toLowerCase().trim() === SUPERADMIN_EMAIL.toLowerCase()
+    ) {
+      return true;
+    }
     const role = effectiveUser.role;
     switch (action) {
       case 'manage_org':
@@ -530,7 +565,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         currentUser,
         effectiveUser,
         impersonatedUser,
-        activeRole: effectiveUser.role,
+        activeRole: (effectiveUser.email?.toLowerCase().trim() === SUPERADMIN_EMAIL.toLowerCase()) ? 'ADMIN' : effectiveUser.role,
         selectedEventId,
         selectedEvent,
         syncStatus,
