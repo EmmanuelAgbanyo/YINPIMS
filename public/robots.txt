@@ -1,0 +1,7 @@
+﻿# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+
+# Host & Sitemap
+Host: https://yinpims.vercel.app
+Sitemap: https://yinpims.vercel.app/sitemap.xml

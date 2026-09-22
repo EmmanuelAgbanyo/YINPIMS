@@ -181,16 +181,16 @@ export const LoginView: React.FC = () => {
                 P
               </div>
               <div>
-                <span className="font-heading font-bold text-xl tracking-tight block">YIN-PIMS</span>
-                <span className="text-[11px] font-semibold text-white/70 uppercase tracking-widest block">Operations Portal</span>
+                <span className="font-heading font-bold text-xl tracking-tight block">YIN PIMS</span>
+                <span className="text-[11px] font-semibold text-white/70 uppercase tracking-widest block">Youth Impact Network</span>
               </div>
             </div>
 
             <h2 className="font-heading font-bold text-2xl sm:text-3xl text-white leading-tight mb-4">
-              Participant & Event Operations System
+              Participant Information Management System
             </h2>
             <p className="text-xs sm:text-sm text-white/80 leading-relaxed mb-6">
-              Cloud Operations Portal for delegate registration management, accommodation allocation, digital badges, and real-time event analytics.
+              Official Youth Impact Network (YIN) platform for participant registration, event tracking, badge issuance, and impact operations (yinpims).
             </p>
 
             {/* Core Capability Badges */}
