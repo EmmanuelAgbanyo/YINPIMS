@@ -153,20 +153,21 @@ class StorageService {
   }
 
   public saveUser(userData: Partial<User> & { name: string; email: string }): User {
-    const isNew = !userData.id;
-    const userId = userData.id || `usr-${Date.now()}`;
-    const existing = this.data.users.find(u => u.id === userId);
+    const emailKey = userData.email.trim().toLowerCase();
+    const existing = this.data.users.find(u => (userData.id && u.id === userData.id) || u.email.toLowerCase() === emailKey);
+    const isNew = !existing;
+    const userId = userData.id || existing?.id || `usr-${Date.now()}`;
     const now = new Date().toISOString();
 
     const newUser: User = {
       id: userId,
       name: userData.name,
-      email: userData.email.trim().toLowerCase(),
-      phone: userData.phone || '',
-      role: userData.role || 'EVENT_COORDINATOR',
-      organizationId: userData.organizationId || 'org-001',
-      assignedEvents: userData.assignedEvents || ['*'],
-      status: userData.status || 'Active',
+      email: emailKey,
+      phone: userData.phone || existing?.phone || '',
+      role: userData.role || existing?.role || 'EVENT_COORDINATOR',
+      organizationId: userData.organizationId || existing?.organizationId || 'org-001',
+      assignedEvents: userData.assignedEvents || existing?.assignedEvents || ['*'],
+      status: userData.status || existing?.status || 'Active',
       avatarUrl: userData.avatarUrl || existing?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
       provisionalPassword: userData.provisionalPassword !== undefined ? userData.provisionalPassword : existing?.provisionalPassword,
       password: userData.password !== undefined ? userData.password : existing?.password,
@@ -180,7 +181,8 @@ class StorageService {
     if (isNew) {
       users.unshift(newUser);
     } else {
-      users = users.map(u => (u.id === userId ? newUser : u));
+      const matchId = existing?.id || userId;
+      users = users.map(u => (u.id === matchId || u.id === userId || u.email.toLowerCase() === emailKey ? newUser : u));
     }
 
     this.saveToStorage({ ...this.data, users });
@@ -247,9 +249,10 @@ class StorageService {
   }
 
   public saveEvent(event: Partial<Event> & { name: string; location: string }): Event {
-    const isNew = !event.id;
-    const now = new Date().toISOString();
     const eventId = event.id || `evt-${Date.now()}`;
+    const existing = this.data.events.find(e => e.id === eventId);
+    const isNew = !existing;
+    const now = new Date().toISOString();
 
     const newEvent: Event = {
       id: eventId,

@@ -208,9 +208,9 @@ export const TeamAccessView: React.FC = () => {
       const remoteUsers = await fetchAllUsersFromFirestore();
       if (remoteUsers && remoteUsers.length > 0) {
         let anyNew = false;
-        const currentUsers = db.getUsers();
         for (const ru of remoteUsers) {
           if (!ru.email) continue;
+          const currentUsers = db.getUsers();
           const existing = currentUsers.find(
             u => u.email.toLowerCase() === ru.email.toLowerCase() || u.id === ru.id || u.id === ru.uid
           );
