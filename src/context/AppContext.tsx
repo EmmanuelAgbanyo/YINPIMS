@@ -4,7 +4,7 @@ import type { DatabaseSchema } from '../services/db';
 import type { User, UserRole, Event } from '../types';
 import { syncService } from '../services/sync';
 import type { SyncStatus, SyncConfig } from '../services/sync';
-import { onAuthUserChange, logoutUser } from '../services/firebase';
+import { onAuthUserChange, logoutUser, syncStaffAccountToFirestore, updateCurrentUserPassword } from '../services/firebase';
 import type { User as FirebaseUser } from 'firebase/auth';
 
 const SUPERADMIN_EMAIL = 'policyp28@gmail.com';
@@ -128,6 +128,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     window.addEventListener('PIMS_LOCAL_DATA_REFRESH', handleDataRefresh);
 
+    // Auto-sync existing local staff accounts to Cloud Firestore for cross-device access
+    try {
+      const localStaff = db.getUsers().filter(u => u.email.toLowerCase() !== SUPERADMIN_EMAIL.toLowerCase());
+      localStaff.forEach(u => {
+        syncStaffAccountToFirestore(u);
+      });
+    } catch (syncErr) {
+      console.warn('Initial staff sync error note:', syncErr);
+    }
+
     return () => {
       unsubscribeAuth();
       unsubscribeStatus();
@@ -178,11 +188,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCurrentUser(updated);
     setSessionUser(updated);
     localStorage.setItem('PIMS_SESSION_USER', JSON.stringify(updated));
+    syncStaffAccountToFirestore(updated);
+    updateCurrentUserPassword(newPassword);
     refreshData();
   };
 
   const issueProvisionalPassword = (userId: string, customPassword?: string) => {
     const res = db.issueProvisionalPassword(userId, customPassword);
+    syncStaffAccountToFirestore(res.user);
     refreshData();
     return res;
   };

@@ -21,7 +21,8 @@ import {
   signInWithGoogle, 
   createRecaptchaVerifier, 
   sendPhoneVerificationCode, 
-  resetUserPassword 
+  resetUserPassword,
+  getStaffAccountFromFirestore
 } from '../../services/firebase';
 import { db } from '../../services/db';
 import { useApp } from '../../context/AppContext';
@@ -80,13 +81,38 @@ export const LoginView: React.FC = () => {
       const normalizedEmail = email.trim().toLowerCase();
       const trimmedPass = password.trim();
 
-      // 1. Check if staff member is logging in with provisional password
-      const localUser = db.getUsers().find(u => u.email.toLowerCase() === normalizedEmail);
-      if (localUser && localUser.provisionalPassword && localUser.provisionalPassword === trimmedPass) {
-        // Instantly establish local session so App transitions to MainLayout & ForcePasswordChangeModal
-        loginWithLocalUser(localUser);
+      // 1. Check local db first
+      let localUser = db.getUsers().find(u => u.email.toLowerCase() === normalizedEmail);
 
-        // Attempt non-blocking Firebase authentication in background
+      // 2. If not found locally on this device, fetch from Cloud Firestore!
+      if (!localUser) {
+        try {
+          const remoteStaff = await getStaffAccountFromFirestore(normalizedEmail);
+          if (remoteStaff) {
+            localUser = db.saveUser({
+              id: remoteStaff.id,
+              name: remoteStaff.name,
+              email: remoteStaff.email,
+              phone: remoteStaff.phone || '',
+              role: remoteStaff.role,
+              organizationId: remoteStaff.organizationId || 'org-001',
+              assignedEvents: remoteStaff.assignedEvents || ['*'],
+              status: remoteStaff.status || 'Active',
+              avatarUrl: remoteStaff.avatarUrl || '',
+              provisionalPassword: remoteStaff.provisionalPassword || undefined,
+              password: remoteStaff.password || undefined,
+              mustChangePassword: remoteStaff.mustChangePassword !== false,
+              passwordSetAt: remoteStaff.passwordSetAt || undefined,
+            });
+          }
+        } catch (fetchErr) {
+          console.warn('Cross-device staff lookup error:', fetchErr);
+        }
+      }
+
+      // 3. Check if staff member is logging in with provisional password
+      if (localUser && localUser.provisionalPassword && localUser.provisionalPassword === trimmedPass) {
+        loginWithLocalUser(localUser);
         try {
           await signInWithEmail(email, password);
         } catch (fbErr: any) {
@@ -101,7 +127,18 @@ export const LoginView: React.FC = () => {
         return;
       }
 
-      // 2. Standard sign in
+      // 4. Check if staff member is logging in with their permanent password
+      if (localUser && localUser.password && localUser.password === trimmedPass) {
+        loginWithLocalUser(localUser);
+        try {
+          await signInWithEmail(email, password);
+        } catch {
+          // Local verification successful
+        }
+        return;
+      }
+
+      // 5. Standard sign in
       try {
         await signInWithEmail(email, password);
         setSuccessMsg(normalizedEmail === 'policyp28@gmail.com' ? 'Welcome Super Admin!' : 'Sign in successful!');

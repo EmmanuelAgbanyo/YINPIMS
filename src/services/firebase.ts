@@ -11,6 +11,7 @@ import {
   signOut,
   onAuthStateChanged,
   updateProfile,
+  updatePassword,
   type User as FirebaseUser,
   type ConfirmationResult
 } from "firebase/auth";
@@ -135,4 +136,50 @@ export const subscribeFirestoreDoc = (collectionName: string, docId: string, cal
       callback(snapshot.data());
     }
   });
+};
+
+export const updateCurrentUserPassword = async (newPassword: string) => {
+  if (auth.currentUser) {
+    try {
+      await updatePassword(auth.currentUser, newPassword);
+    } catch (e) {
+      console.warn('Firebase Auth updatePassword note:', e);
+    }
+  }
+};
+
+// Cross-Device Staff Account Firestore Synchronization
+export const syncStaffAccountToFirestore = async (user: any) => {
+  try {
+    const docId = user.email.toLowerCase().trim().replace(/[\/\\]/g, '_');
+    await syncFirestoreDoc('staff_accounts', docId, {
+      id: user.id,
+      name: user.name,
+      email: user.email.toLowerCase().trim(),
+      phone: user.phone || '',
+      role: user.role,
+      organizationId: user.organizationId || 'org-001',
+      assignedEvents: user.assignedEvents || ['*'],
+      status: user.status || 'Active',
+      avatarUrl: user.avatarUrl || '',
+      provisionalPassword: user.provisionalPassword || null,
+      password: user.password || null,
+      mustChangePassword: user.mustChangePassword !== false,
+      passwordSetAt: user.passwordSetAt || null,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.warn('Failed to sync staff account to Firestore:', err);
+  }
+};
+
+export const getStaffAccountFromFirestore = async (email: string) => {
+  try {
+    const docId = email.toLowerCase().trim().replace(/[\/\\]/g, '_');
+    const data = await getFirestoreDoc('staff_accounts', docId);
+    return data;
+  } catch (err) {
+    console.warn('Failed to fetch staff account from Firestore:', err);
+    return null;
+  }
 };

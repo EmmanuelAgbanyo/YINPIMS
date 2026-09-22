@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { db } from '../../services/db';
-import { syncFirestoreDoc } from '../../services/firebase';
+import { syncFirestoreDoc, syncStaffAccountToFirestore } from '../../services/firebase';
 import type { User, UserRole } from '../../types';
 import { StaffInviteCardModal } from './StaffInviteCardModal';
 import { 
@@ -133,8 +133,9 @@ export const TeamAccessView: React.FC = () => {
         mustChangePassword,
       });
 
-      // Real-time Sync to Firestore users collection
+      // Real-time Sync to Firestore staff_accounts & users collection
       try {
+        await syncStaffAccountToFirestore(savedUser);
         await syncFirestoreDoc('users', savedUser.id, {
           uid: savedUser.id,
           name: savedUser.name,
@@ -210,10 +211,12 @@ export const TeamAccessView: React.FC = () => {
       return;
     }
     const nextStatus = member.status === 'Active' ? 'Inactive' : 'Active';
-    db.saveUser({
+    const updated = {
       ...member,
-      status: nextStatus,
-    });
+      status: nextStatus as 'Active' | 'Inactive',
+    };
+    db.saveUser(updated);
+    syncStaffAccountToFirestore(updated);
     refreshData();
   };
 

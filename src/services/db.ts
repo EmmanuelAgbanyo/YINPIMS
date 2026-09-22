@@ -169,6 +169,7 @@ class StorageService {
       status: userData.status || 'Active',
       avatarUrl: userData.avatarUrl || existing?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
       provisionalPassword: userData.provisionalPassword !== undefined ? userData.provisionalPassword : existing?.provisionalPassword,
+      password: userData.password !== undefined ? userData.password : existing?.password,
       mustChangePassword: userData.mustChangePassword !== undefined ? userData.mustChangePassword : (isNew ? true : existing?.mustChangePassword),
       passwordSetAt: userData.passwordSetAt || existing?.passwordSetAt,
       lastLoginAt: userData.lastLoginAt || existing?.lastLoginAt,
@@ -212,7 +213,7 @@ class StorageService {
     return { user: updatedUser, provisionalPassword: provPass };
   }
 
-  public updateUserPassword(userId: string, _newPassword?: string): User {
+  public updateUserPassword(userId: string, newPassword?: string): User {
     const user = this.data.users.find(u => u.id === userId);
     if (!user) throw new Error('User not found.');
 
@@ -220,6 +221,7 @@ class StorageService {
     const updatedUser: User = {
       ...user,
       provisionalPassword: undefined,
+      password: newPassword || user.password,
       mustChangePassword: false,
       passwordSetAt: now,
     };

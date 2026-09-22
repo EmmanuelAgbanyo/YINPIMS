@@ -11,6 +11,7 @@ export interface User {
   status: 'Active' | 'Inactive';
   avatarUrl?: string;
   provisionalPassword?: string;
+  password?: string;
   mustChangePassword?: boolean;
   passwordSetAt?: string;
   lastLoginAt?: string;
