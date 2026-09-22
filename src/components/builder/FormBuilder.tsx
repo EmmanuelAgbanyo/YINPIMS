@@ -111,6 +111,32 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({ initialEventId }) => {
     handleReorder(index, targetIdx);
   };
 
+  const isCoreIdentityField = (q: RegistrationQuestion) => {
+    return q.isSystemQuestion && ['Full Name', 'Email Address'].includes(q.label.trim());
+  };
+
+  const handleToggleRequired = (id: string) => {
+    const target = questions.find(q => q.id === id);
+    if (!target || isCoreIdentityField(target)) return;
+    handleUpdateQuestion(id, { required: !target.required });
+  };
+
+  const makeAllRequired = () => {
+    const updated = questions.map(q => ({ ...q, required: true }));
+    saveQuestions(updated);
+  };
+
+  const makeNonCoreOptional = () => {
+    const updated = questions.map(q => {
+      if (isCoreIdentityField(q)) return { ...q, required: true };
+      return { ...q, required: false };
+    });
+    saveQuestions(updated);
+  };
+
+  const requiredCount = questions.filter(q => q.required).length;
+  const optionalCount = questions.length - requiredCount;
+
   const getQuestionTypeIcon = (type: QuestionType) => {
     switch (type) {
       case 'short_text': return AlignLeft;
@@ -184,6 +210,38 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({ initialEventId }) => {
         </div>
       </div>
 
+      {/* Form Fields Summary & Quick Bulk Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-white rounded-lg border border-[#E4E4E1] shadow-2xs">
+        <div className="flex items-center gap-2.5 text-xs">
+          <span className="font-bold text-[#1C1C1A]">Field Requirements:</span>
+          <span className="px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 font-bold text-[11px] flex items-center gap-1">
+            <span className="text-red-500 font-extrabold">*</span> {requiredCount} Required
+          </span>
+          <span className="px-2 py-0.5 rounded-full bg-[#FAFAF9] text-[#6B6B66] border border-[#E4E4E1] font-semibold text-[11px]">
+            {optionalCount} Optional
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={makeNonCoreOptional}
+            className="text-[11px] font-semibold text-[#6B6B66] hover:text-[#14595A] bg-[#FAFAF9] hover:bg-white border border-[#E4E4E1] px-2.5 py-1 rounded cursor-pointer transition-colors"
+            title="Make non-essential questions optional (Full Name & Email remain required)"
+          >
+            Make Non-Core Optional
+          </button>
+          <button
+            type="button"
+            onClick={makeAllRequired}
+            className="text-[11px] font-semibold text-[#14595A] hover:text-[#0E4243] bg-[#EBF4F4] hover:bg-[#EBF4F4]/80 border border-[#14595A]/20 px-2.5 py-1 rounded cursor-pointer transition-colors"
+            title="Make all questions required"
+          >
+            Make All Required
+          </button>
+        </div>
+      </div>
+
       {/* Main Question Editor List */}
       <div className="space-y-4">
         {questions.map((q, idx) => {
@@ -251,18 +309,39 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({ initialEventId }) => {
                       type="text"
                       value={q.label}
                       onChange={e => handleUpdateQuestion(q.id, { label: e.target.value })}
-                      readOnly={q.isSystemQuestion && ['Full Name', 'Email Address', 'Phone Number'].includes(q.label)}
+                      readOnly={q.isSystemQuestion && ['Full Name', 'Email Address'].includes(q.label)}
                       placeholder="Enter question label..."
                       className={`flex-1 h-9 px-3 text-xs font-semibold rounded-md border bg-white focus:outline-none ${
                         q.isSystemQuestion ? 'border-[#E4E4E1] text-[#6B6B66]' : 'border-[#E4E4E1] focus:border-[#14595A] text-[#1C1C1A]'
                       }`}
                     />
 
-                    {q.isSystemQuestion && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#14595A]/10 text-[#14595A] flex items-center space-x-1 shrink-0">
-                        <Lock className="h-3 w-3" />
-                        <span>System Field</span>
+                    {/* Required / Optional Quick Badge */}
+                    {isCoreIdentityField(q) ? (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200 flex items-center space-x-1 shrink-0" title="Full Name and Email Address are core required identity fields">
+                        <Lock className="h-3 w-3 text-red-500" />
+                        <span>Core Required</span>
                       </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleRequired(q.id)}
+                        className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border transition-all cursor-pointer flex items-center space-x-1 shrink-0 shadow-2xs ${
+                          q.required
+                            ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
+                            : 'bg-[#FAFAF9] text-[#6B6B66] border-[#E4E4E1] hover:bg-[#EBF4F4] hover:text-[#14595A]'
+                        }`}
+                        title={q.required ? 'Click to make Optional' : 'Click to make Required'}
+                      >
+                        {q.required ? (
+                          <>
+                            <span className="text-red-500 font-extrabold text-xs leading-none">*</span>
+                            <span>Required</span>
+                          </>
+                        ) : (
+                          <span>Optional</span>
+                        )}
+                      </button>
                     )}
                   </div>
 
@@ -340,16 +419,41 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({ initialEventId }) => {
 
                 {/* Footer Controls: Required toggle, Duplicate, Delete, Reorder */}
                 <div className="flex items-center justify-between pt-2 border-t border-[#E4E4E1] text-xs">
-                  <label className="flex items-center space-x-2 cursor-pointer font-medium text-[#1C1C1A]">
-                    <input
-                      type="checkbox"
-                      checked={q.required}
-                      onChange={e => handleUpdateQuestion(q.id, { required: e.target.checked })}
-                      disabled={q.isSystemQuestion}
-                      className="rounded text-[#14595A] focus:ring-[#14595A]"
-                    />
-                    <span>Required Field</span>
-                  </label>
+                  {isCoreIdentityField(q) ? (
+                    <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded bg-red-50/70 border border-red-200 text-[11px] font-bold text-red-700">
+                      <Lock className="h-3.5 w-3.5 text-red-500" />
+                      <span>Mandatory Core Field (Locked)</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-[11px] font-medium text-[#6B6B66]">Requirement:</span>
+                      <div className="inline-flex p-0.5 rounded-md bg-[#FAFAF9] border border-[#E4E4E1]">
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateQuestion(q.id, { required: false })}
+                          className={`px-2.5 py-0.5 rounded text-[11px] transition-all cursor-pointer ${
+                            !q.required
+                              ? 'bg-white text-[#1C1C1A] shadow-2xs font-bold border border-[#E4E4E1]/60'
+                              : 'text-[#6B6B66] hover:text-[#1C1C1A]'
+                          }`}
+                        >
+                          Optional
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateQuestion(q.id, { required: true })}
+                          className={`px-2.5 py-0.5 rounded text-[11px] transition-all cursor-pointer flex items-center space-x-1 ${
+                            q.required
+                              ? 'bg-red-50 text-red-700 border border-red-200 shadow-2xs font-bold'
+                              : 'text-[#6B6B66] hover:text-red-700'
+                          }`}
+                        >
+                          <span className="text-red-500 font-extrabold">*</span>
+                          <span>Required</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="flex items-center space-x-1">
                     <button

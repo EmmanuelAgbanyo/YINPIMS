@@ -65,7 +65,7 @@ export const PublicRegistrationModal: React.FC<PublicRegistrationModalProps> = (
         }
       }
 
-      if (q.type === 'email' && val && typeof val === 'string') {
+      if (q.type === 'email' && val && typeof val === 'string' && val.trim().length > 0) {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(val.trim())) {
           newErrors[q.id] = 'Please enter a valid email address.';
@@ -261,7 +261,11 @@ export const PublicRegistrationModal: React.FC<PublicRegistrationModalProps> = (
                 {questions.map(q => (
                   <div key={q.id} className="space-y-1">
                     <label className="block text-xs font-semibold text-[#1C1C1A]">
-                      {q.label} {q.required && <span className="text-[#B0413E]">*</span>}
+                      {q.label} {q.required ? (
+                        <span className="text-[#B0413E] font-bold">*</span>
+                      ) : (
+                        <span className="text-[11px] font-normal text-[#8A8A85] ml-1">(Optional)</span>
+                      )}
                     </label>
 
                     {q.type === 'short_text' && (

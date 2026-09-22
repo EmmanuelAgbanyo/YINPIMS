@@ -67,7 +67,11 @@ export const FormPreviewModal: React.FC<FormPreviewModalProps> = ({
             {questions.map(q => (
               <div key={q.id} className="space-y-1.5">
                 <label className="block text-xs font-semibold text-[#1C1C1A]">
-                  {q.label} {q.required && <span className="text-[#B0413E]">*</span>}
+                  {q.label} {q.required ? (
+                    <span className="text-[#B0413E] font-bold">*</span>
+                  ) : (
+                    <span className="text-[11px] font-normal text-[#8A8A85] ml-1">(Optional)</span>
+                  )}
                 </label>
 
                 {/* Question Control Rendering */}
