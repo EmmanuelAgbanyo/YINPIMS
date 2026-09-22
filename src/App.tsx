@@ -26,6 +26,7 @@ import { AuthModal } from './components/auth/AuthModal';
 import { ForcePasswordChangeModal } from './components/auth/ForcePasswordChangeModal';
 import { LoginView } from './components/auth/LoginView';
 import { PublicPassView } from './components/pass/PublicPassView';
+import { detectPassUrlFromLocation } from './utils/qrUtils';
 import { auth, onAuthUserChange } from './services/firebase';
 import type { User as FirebaseUser } from 'firebase/auth';
 import type { Event } from './types';
@@ -85,33 +86,13 @@ const MainLayout: React.FC = () => {
 
   // Check URL parameters for public pass/badge
   const [passIdentifier, setPassIdentifier] = useState<string | null>(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const queryPass = params.get('pass') || params.get('badge') || params.get('qr');
-      if (queryPass) return queryPass;
-      const match = window.location.pathname.match(/\/(?:badge|pass|verify)\/([^/]+)/i);
-      if (match && match[1]) return decodeURIComponent(match[1]);
-    } catch {
-      // fallback
-    }
-    return null;
+    return detectPassUrlFromLocation();
   });
 
   // Listen to browser popstate for pass URL changes
   useEffect(() => {
     const handlePopState = () => {
-      try {
-        const params = new URLSearchParams(window.location.search);
-        const queryPass = params.get('pass') || params.get('badge') || params.get('qr');
-        if (queryPass) {
-          setPassIdentifier(queryPass);
-        } else {
-          const match = window.location.pathname.match(/\/(?:badge|pass|verify)\/([^/]+)/i);
-          setPassIdentifier(match && match[1] ? decodeURIComponent(match[1]) : null);
-        }
-      } catch {
-        // fallback
-      }
+      setPassIdentifier(detectPassUrlFromLocation());
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);

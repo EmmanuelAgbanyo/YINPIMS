@@ -1,4 +1,4 @@
-﻿rules_version = '2';
+rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
@@ -20,6 +20,21 @@ service cloud.firestore {
     
     // Participants: Allow QR scanning check-in and registration
     match /participants/{participantId} {
+      allow read, write: if true;
+    }
+
+    // Registrations: Allow public pass QR scanning and check-in
+    match /registrations/{registrationId} {
+      allow read, write: if true;
+    }
+
+    // Accommodation Rooms
+    match /rooms/{roomId} {
+      allow read, write: if true;
+    }
+
+    // Registration Form Questions
+    match /questions/{questionId} {
       allow read, write: if true;
     }
     

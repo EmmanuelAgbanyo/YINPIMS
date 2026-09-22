@@ -112,13 +112,17 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
     }
   };
 
+  const passUrl = useMemo(
+    () => getPassUrl(registration.qrIdentifier, { registration, participant, event }),
+    [registration, participant, event]
+  );
+
   const handlePrint = () => {
     window.print();
   };
 
   const handleCopyLink = () => {
-    const url = getPassUrl(registration.qrIdentifier);
-    navigator.clipboard.writeText(url);
+    navigator.clipboard.writeText(passUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
   };
@@ -291,7 +295,7 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
               {/* QR Code Centerpiece */}
               <div className="space-y-1.5">
                 <a
-                  href={getPassUrl(registration.qrIdentifier)}
+                  href={passUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="bg-[#FAFAF9] p-3 rounded-xl border border-[#E4E4E1] inline-block shadow-2xs hover:border-[#14595A] hover:shadow-md transition-all cursor-pointer group"
@@ -299,7 +303,7 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
                   title="Click to open and test live mobile pass view"
                 >
                   <QRCodeSVG
-                    value={getPassUrl(registration.qrIdentifier)}
+                    value={passUrl}
                     size={140}
                     level="H"
                     includeMargin={true}
@@ -342,7 +346,7 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
           {/* Badge Action Buttons */}
           <div className="no-print flex flex-wrap items-center justify-center gap-2 w-full pt-2">
             <a
-              href={getPassUrl(registration.qrIdentifier)}
+              href={passUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center space-x-1.5 h-9 px-3.5 bg-[#EBF4F4] text-[#14595A] text-xs font-bold rounded-xl hover:bg-[#D7E9E9] transition-colors cursor-pointer shadow-2xs"

@@ -299,13 +299,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (cloudEvents && cloudEvents.length > 0) {
         db.mergeEventsFromCloud(cloudEvents);
         refreshData();
-      } else {
-        // Hydrate Firestore from local database if Firestore is currently empty
-        const localEvents = db.getEvents();
-        if (localEvents.length > 0) {
-          localEvents.forEach(evt => syncEventToFirestore(evt));
-        }
       }
+      // Ensure all local events are backed up in Firestore
+      const cloudEventIds = new Set((cloudEvents || []).map(e => e.id));
+      const localEvents = db.getEvents();
+      localEvents.forEach(evt => {
+        if (!cloudEventIds.has(evt.id)) {
+          syncEventToFirestore(evt);
+        }
+      });
     });
 
     // 2. Cloud Firestore Real-Time Participants & Registrations Sync
@@ -320,12 +322,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (cloudParticipants && cloudParticipants.length > 0) {
         db.mergeParticipantsFromCloud(cloudParticipants);
         refreshData();
-      } else {
-        const localParts = db.getParticipants();
-        if (localParts.length > 0) {
-          localParts.forEach(p => syncParticipantToFirestore(p));
-        }
       }
+      // Ensure all local participants are backed up in Firestore
+      const cloudPartIds = new Set((cloudParticipants || []).map(p => p.id));
+      const localParts = db.getParticipants();
+      localParts.forEach(p => {
+        if (!cloudPartIds.has(p.id)) {
+          syncParticipantToFirestore(p);
+        }
+      });
     });
 
     const unsubscribeRegistrations = subscribeAllRegistrations((cloudRegs) => {
@@ -339,12 +344,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (cloudRegs && cloudRegs.length > 0) {
         db.mergeRegistrationsFromCloud(cloudRegs);
         refreshData();
-      } else {
-        const localRegs = db.getRegistrations();
-        if (localRegs.length > 0) {
-          localRegs.forEach(r => syncRegistrationToFirestore(r));
-        }
       }
+      // Ensure all local registrations are backed up in Firestore
+      const cloudRegIds = new Set((cloudRegs || []).map(r => r.id));
+      const localRegs = db.getRegistrations();
+      localRegs.forEach(r => {
+        if (!cloudRegIds.has(r.id)) {
+          syncRegistrationToFirestore(r);
+        }
+      });
     });
 
     // 3. Cloud Firestore Real-Time Rooms & Questions Sync

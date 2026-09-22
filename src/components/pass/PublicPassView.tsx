@@ -8,15 +8,18 @@ import {
   getPassUrl,
   playSuccessBeep,
   triggerHapticFeedback,
-  extractPassIdentifier
+  extractPassIdentifier,
+  findRegistrationFromInput,
+  extractPayloadFromUrl,
 } from '../../utils/qrUtils';
 import {
   fetchAllRegistrationsFromFirestore,
   fetchAllParticipantsFromFirestore,
   fetchAllEventsFromFirestore,
-  fetchAllRoomsFromFirestore
+  fetchAllRoomsFromFirestore,
+  getFirestoreDoc,
 } from '../../services/firebase';
-import type { ParticipantBadgeType } from '../../types';
+import type { ParticipantBadgeType, Registration, Participant } from '../../types';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -62,6 +65,13 @@ export const PublicPassView: React.FC<PublicPassViewProps> = ({
   const [justCheckedIn, setJustCheckedIn] = useState(false);
   const [loadingCloud, setLoadingCloud] = useState(false);
 
+  // Sync state if initialIdentifier prop changes
+  useEffect(() => {
+    if (initialIdentifier && initialIdentifier !== currentId) {
+      setCurrentId(initialIdentifier);
+    }
+  }, [initialIdentifier]);
+
   // Live ticking security clock to assure pass validity
   useEffect(() => {
     const timer = setInterval(() => {
@@ -72,70 +82,216 @@ export const PublicPassView: React.FC<PublicPassViewProps> = ({
 
   const cleanPassId = extractPassIdentifier(currentId);
 
-  // Locate registration record in local memory (exact or partial fallback)
-  const registration = data.registrations.find(r => {
-    const qId = (r.qrIdentifier || '').toLowerCase().trim();
-    const regId = (r.id || '').toLowerCase().trim();
-    const target = cleanPassId.toLowerCase().trim();
-    const rawTarget = currentId.toLowerCase().trim();
+  // Check if URL contains an encoded pass payload
+  const urlPayload = useMemo(() => {
+    const fromHref = typeof window !== 'undefined' ? extractPayloadFromUrl(window.location.href) : null;
+    return fromHref || extractPayloadFromUrl(currentId);
+  }, [currentId]);
 
-    return (
-      qId === target ||
-      regId === target ||
-      qId === rawTarget ||
-      regId === rawTarget ||
-      (target.length >= 6 && (qId.includes(target) || target.includes(qId)))
-    );
-  });
+  // Locate registration record in local memory or construct from URL payload
+  const resolvedRecord = useMemo(() => {
+    const found = findRegistrationFromInput(data.registrations, data.participants, currentId);
+    if (found) return found;
 
-  // If not found in local state on a cold device, auto-fetch from Cloud Firestore
+    // If not in local database, but URL contains embedded payload, build synthetic records
+    if (urlPayload) {
+      const syntheticReg: Registration = {
+        id: urlPayload.rId,
+        eventId: urlPayload.eId,
+        participantId: urlPayload.pId,
+        status: (urlPayload.st as any) || 'Confirmed',
+        badgeType: (urlPayload.bt as any) || 'Delegate',
+        registrationDate: new Date().toISOString(),
+        checkInStatus: urlPayload.ci ? 'Checked In' : 'Not Checked In',
+        qrIdentifier: cleanPassId || `QR-PIMS-${urlPayload.eId.toUpperCase()}-${urlPayload.pId.toUpperCase()}-${urlPayload.rId.toUpperCase()}`,
+        accommodationRequired: false,
+        responses: urlPayload.org ? { 'Institution / School': urlPayload.org } : {},
+      };
+
+      const syntheticPart: Participant = {
+        id: urlPayload.pId,
+        fullName: urlPayload.fn,
+        email: '',
+        phone: '',
+        gender: 'Prefer not to say',
+        organization: urlPayload.org,
+        badgeType: (urlPayload.bt as any) || 'Delegate',
+        createdAt: new Date().toISOString(),
+      };
+
+      return { registration: syntheticReg, participant: syntheticPart };
+    }
+
+    return null;
+  }, [data.registrations, data.participants, currentId, urlPayload, cleanPassId]);
+
+  const registration = resolvedRecord?.registration;
+
+  // Automatically persist URL payload to local DB so subsequent loads work offline
+  useEffect(() => {
+    if (urlPayload && resolvedRecord?.registration && resolvedRecord?.participant) {
+      const alreadyHasReg = data.registrations.some(r => r.id === urlPayload.rId);
+      if (!alreadyHasReg) {
+        db.mergeRegistrationsFromCloud([resolvedRecord.registration]);
+        db.mergeParticipantsFromCloud([resolvedRecord.participant]);
+        refreshData();
+      }
+    }
+  }, [urlPayload, resolvedRecord, data.registrations, refreshData]);
+
+  // Robust targeted Cloud Firestore hydration on cold or new devices
   useEffect(() => {
     if (!registration) {
       setLoadingCloud(true);
-      Promise.all([
-        fetchAllRegistrationsFromFirestore(),
-        fetchAllParticipantsFromFirestore(),
-        fetchAllEventsFromFirestore(),
-        fetchAllRoomsFromFirestore(),
-      ])
-        .then(([regs, parts, evts, rms]) => {
-          let updated = false;
-          if (regs && regs.length > 0) {
-            db.mergeRegistrationsFromCloud(regs);
-            updated = true;
+
+      const regMatch = cleanPassId.match(/reg-[a-z0-9-]+/i) || currentId.match(/reg-[a-z0-9-]+/i);
+      const prtMatch = cleanPassId.match(/prt-[a-z0-9-]+/i) || currentId.match(/prt-[a-z0-9-]+/i);
+      const targetRegId = regMatch ? regMatch[0].toLowerCase() : (cleanPassId.startsWith('reg-') ? cleanPassId.toLowerCase() : null);
+      const targetPrtId = prtMatch ? prtMatch[0].toLowerCase() : (cleanPassId.startsWith('prt-') ? cleanPassId.toLowerCase() : null);
+
+      const fetchDirect = async () => {
+        let updated = false;
+        if (targetRegId) {
+          try {
+            const cloudReg = (await getFirestoreDoc('registrations', targetRegId)) as Registration | null;
+            if (cloudReg) {
+              db.mergeRegistrationsFromCloud([cloudReg]);
+              updated = true;
+            }
+          } catch {
+            // ignore
           }
-          if (parts && parts.length > 0) {
-            db.mergeParticipantsFromCloud(parts);
-            updated = true;
+        }
+        if (targetPrtId) {
+          try {
+            const cloudPrt = (await getFirestoreDoc('participants', targetPrtId)) as Participant | null;
+            if (cloudPrt) {
+              db.mergeParticipantsFromCloud([cloudPrt]);
+              updated = true;
+            }
+          } catch {
+            // ignore
           }
-          if (evts && evts.length > 0) {
-            db.mergeEventsFromCloud(evts);
-            updated = true;
-          }
-          if (rms && rms.length > 0) {
-            db.mergeRoomsFromCloud(rms);
-            updated = true;
-          }
-          if (updated) {
-            refreshData();
-          }
-        })
-        .catch(err => {
-          console.warn('Cloud pass hydration note:', err);
-        })
-        .finally(() => {
-          setLoadingCloud(false);
-        });
+        }
+        if (updated) {
+          refreshData();
+        }
+      };
+
+      fetchDirect().finally(() => {
+        Promise.all([
+          fetchAllRegistrationsFromFirestore(),
+          fetchAllParticipantsFromFirestore(),
+          fetchAllEventsFromFirestore(),
+          fetchAllRoomsFromFirestore(),
+        ])
+          .then(([regs, parts, evts, rms]) => {
+            let updated = false;
+            if (regs && regs.length > 0) {
+              db.mergeRegistrationsFromCloud(regs);
+              updated = true;
+            }
+            if (parts && parts.length > 0) {
+              db.mergeParticipantsFromCloud(parts);
+              updated = true;
+            }
+            if (evts && evts.length > 0) {
+              db.mergeEventsFromCloud(evts);
+              updated = true;
+            }
+            if (rms && rms.length > 0) {
+              db.mergeRoomsFromCloud(rms);
+              updated = true;
+            }
+            if (updated) {
+              refreshData();
+            }
+          })
+          .catch(err => {
+            console.warn('Cloud pass hydration note:', err);
+          })
+          .finally(() => {
+            setLoadingCloud(false);
+          });
+      });
     }
-  }, [currentId, registration, refreshData]);
+  }, [currentId, cleanPassId, registration, refreshData]);
 
-  const participant = registration
-    ? data.participants.find(p => p.id === registration.participantId)
-    : data.participants.find(p => p.id.toLowerCase() === cleanPassId.toLowerCase());
+  // Robust Participant Resolution with synthetic fallback
+  const participant = useMemo(() => {
+    if (resolvedRecord?.participant) return resolvedRecord.participant;
 
-  const event = registration
-    ? data.events.find(e => e.id === registration.eventId)
-    : data.events[0] || null;
+    if (registration) {
+      const direct = data.participants.find(
+        p => (p.id || '').toLowerCase() === (registration.participantId || '').toLowerCase()
+      );
+      if (direct) return direct;
+    }
+
+    const byCleanId = data.participants.find(
+      p =>
+        (p.id || '').toLowerCase() === cleanPassId.toLowerCase() ||
+        cleanPassId.toLowerCase().includes((p.id || '').toLowerCase())
+    );
+    if (byCleanId) return byCleanId;
+
+    // Resilient synthetic participant if registration exists
+    if (registration) {
+      let name = 'Registered Attendee';
+      let org = '';
+      let email = '';
+      let phone = '';
+      if (registration.responses) {
+        for (const [k, v] of Object.entries(registration.responses)) {
+          if (typeof v === 'string') {
+            const lk = k.toLowerCase();
+            if (lk.includes('name') && name === 'Registered Attendee') name = v.trim();
+            if (lk.includes('institution') || lk.includes('school') || lk.includes('organization')) org = v.trim();
+            if (lk.includes('email')) email = v.trim();
+            if (lk.includes('phone')) phone = v.trim();
+          }
+        }
+      }
+      return {
+        id: registration.participantId || 'prt-pass',
+        fullName: name,
+        email,
+        phone,
+        gender: 'Prefer not to say',
+        organization: org || undefined,
+        badgeType: registration.badgeType || 'Delegate',
+        createdAt: registration.registrationDate,
+      } as Participant;
+    }
+
+    return null;
+  }, [resolvedRecord, registration, data.participants, cleanPassId]);
+
+  // Resilient Event Resolution with default fallback so missing event NEVER triggers not found
+  const event = useMemo(() => {
+    if (registration) {
+      const direct = data.events.find(
+        e => (e.id || '').toLowerCase() === (registration.eventId || '').toLowerCase()
+      );
+      if (direct) return direct;
+    }
+    return (
+      data.events[0] || {
+        id: registration?.eventId || 'evt-yin-default',
+        name: urlPayload?.eNm || 'Young Investors Network Event',
+        description: 'Official YIN Event',
+        startDate: new Date().toISOString(),
+        endDate: new Date().toISOString(),
+        location: 'Main Venue',
+        status: 'Published',
+        capacity: 500,
+        accommodationEnabled: true,
+        organizerId: 'org-001',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+    );
+  }, [registration, data.events, urlPayload]);
 
   const room = registration?.roomAssignmentId
     ? data.rooms.find(r => r.id === registration.roomAssignmentId)
@@ -204,7 +360,11 @@ export const PublicPassView: React.FC<PublicPassViewProps> = ({
 
   const handleCopyLink = () => {
     if (!registration) return;
-    const url = getPassUrl(registration.qrIdentifier);
+    const url = getPassUrl(registration.qrIdentifier, {
+      registration,
+      participant: participant || undefined,
+      event: event || undefined,
+    });
     navigator.clipboard.writeText(url);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2500);
@@ -214,18 +374,9 @@ export const PublicPassView: React.FC<PublicPassViewProps> = ({
     e.preventDefault();
     if (!searchInput.trim()) return;
 
-    const term = searchInput.trim().toLowerCase();
-    const foundReg = data.registrations.find(r => {
-      if (r.id.toLowerCase() === term || r.qrIdentifier.toLowerCase() === term) return true;
-      const p = data.participants.find(part => part.id === r.participantId);
-      if (p && (p.fullName.toLowerCase().includes(term) || p.email.toLowerCase().includes(term))) {
-        return true;
-      }
-      return false;
-    });
-
-    if (foundReg) {
-      setCurrentId(foundReg.qrIdentifier);
+    const match = findRegistrationFromInput(data.registrations, data.participants, searchInput);
+    if (match) {
+      setCurrentId(match.registration.qrIdentifier || match.registration.id);
       setSearchInput('');
     } else {
       alert(`No registration record found for "${searchInput}".`);
@@ -527,7 +678,11 @@ export const PublicPassView: React.FC<PublicPassViewProps> = ({
                     style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}
                   >
                     <QRCodeSVG
-                      value={getPassUrl(registration.qrIdentifier)}
+                      value={getPassUrl(registration.qrIdentifier, {
+                        registration,
+                        participant: participant || undefined,
+                        event: event || undefined,
+                      })}
                       size={170}
                       level="H"
                       includeMargin={true}

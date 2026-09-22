@@ -6,7 +6,8 @@ import type { Registration, Participant, ParticipantBadgeType, Event } from '../
 import { BatchBadgePrintModal } from '../badge/BatchBadgePrintModal';
 import { ParticipantBadgeModal, getBadgeTitleTheme } from '../badge/ParticipantBadgeModal';
 import { EditParticipantModal } from '../participants/EditParticipantModal';
-import { extractPassIdentifier, playSuccessBeep, triggerHapticFeedback } from '../../utils/qrUtils';
+import { extractPassIdentifier, playSuccessBeep, triggerHapticFeedback, findRegistrationFromInput } from '../../utils/qrUtils';
+import { getFirestoreDoc } from '../../services/firebase';
 import {
   Search,
   CheckCircle2,
@@ -129,24 +130,45 @@ export const CheckInView: React.FC<CheckInViewProps> = ({ filterEventId }) => {
   }, [toast]);
 
   // Handle Scan Logic
-  const handleScanCode = (qrCodeString: string) => {
-    const cleanCode = extractPassIdentifier(qrCodeString);
-    const allRegs = data.registrations;
-    const reg = allRegs.find(
-      r =>
-        r.qrIdentifier.toLowerCase() === cleanCode.toLowerCase() ||
-        r.id.toLowerCase() === cleanCode.toLowerCase() ||
-        r.qrIdentifier.toLowerCase() === qrCodeString.trim().toLowerCase() ||
-        r.id.toLowerCase() === qrCodeString.trim().toLowerCase()
-    );
+  const handleScanCode = async (qrCodeString: string) => {
+    let match = findRegistrationFromInput(data.registrations, data.participants, qrCodeString);
 
-    if (!reg) {
+    // If not found locally, try on-demand fetch from Cloud Firestore
+    if (!match) {
+      const cleanCode = extractPassIdentifier(qrCodeString);
+      const regMatch = cleanCode.match(/reg-[a-z0-9-]+/i) || qrCodeString.match(/reg-[a-z0-9-]+/i);
+      const targetRegId = regMatch ? regMatch[0].toLowerCase() : (cleanCode.startsWith('reg-') ? cleanCode.toLowerCase() : null);
+
+      if (targetRegId) {
+        try {
+          const cloudReg = (await getFirestoreDoc('registrations', targetRegId)) as Registration | null;
+          if (cloudReg) {
+            db.mergeRegistrationsFromCloud([cloudReg]);
+            if (cloudReg.participantId) {
+              const cloudPrt = (await getFirestoreDoc('participants', cloudReg.participantId)) as Participant | null;
+              if (cloudPrt) db.mergeParticipantsFromCloud([cloudPrt]);
+            }
+            refreshData();
+            match = {
+              registration: cloudReg,
+              participant: data.participants.find(p => p.id === cloudReg.participantId)
+            };
+          }
+        } catch (e) {
+          console.warn('On-demand checkin scan Firestore fetch note:', e);
+        }
+      }
+    }
+
+    if (!match || !match.registration) {
       setScanResult({
         status: 'invalid',
         message: `Invalid QR Code scanned: "${qrCodeString}". No matching registration record found in system.`,
       });
       return;
     }
+
+    const reg = match.registration;
 
     if (!activeEvent || reg.eventId !== activeEvent.id) {
       const otherEvent = data.events.find(e => e.id === reg.eventId);

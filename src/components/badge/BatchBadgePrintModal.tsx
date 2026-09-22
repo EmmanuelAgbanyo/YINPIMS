@@ -537,7 +537,7 @@ export const BatchBadgePrintModal: React.FC<BatchBadgePrintModalProps> = ({
                         {/* QR Code Centerpiece */}
                         <div className="bg-[#FAFAF9] p-2 rounded-md border border-[#E4E4E1] inline-block shadow-2xs" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
                           <QRCodeSVG
-                            value={getPassUrl(reg.qrIdentifier)}
+                            value={getPassUrl(reg.qrIdentifier, { registration: reg, participant, event })}
                             size={110}
                             level="H"
                             includeMargin={false}
