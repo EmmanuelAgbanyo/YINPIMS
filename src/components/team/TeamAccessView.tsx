@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { db } from '../../services/db';
-import { syncFirestoreDoc, syncStaffAccountToFirestore, registerStaffInFirebaseAuth, encodeStaffProfile } from '../../services/firebase';
+import { syncFirestoreDoc, syncStaffAccountToFirestore, registerStaffInFirebaseAuth, encodeStaffProfile, fetchAllUsersFromFirestore } from '../../services/firebase';
 import type { User, UserRole } from '../../types';
 import { StaffInviteCardModal } from './StaffInviteCardModal';
 import { 
@@ -200,6 +200,53 @@ export const TeamAccessView: React.FC = () => {
 
   const [isSyncingAll, setIsSyncingAll] = useState(false);
   const [syncAllMsg, setSyncAllMsg] = useState<string | null>(null);
+  const [isFetchingCloudUsers, setIsFetchingCloudUsers] = useState(false);
+
+  const syncGoogleUsers = async () => {
+    setIsFetchingCloudUsers(true);
+    try {
+      const remoteUsers = await fetchAllUsersFromFirestore();
+      if (remoteUsers && remoteUsers.length > 0) {
+        let anyNew = false;
+        const currentUsers = db.getUsers();
+        for (const ru of remoteUsers) {
+          if (!ru.email) continue;
+          const existing = currentUsers.find(
+            u => u.email.toLowerCase() === ru.email.toLowerCase() || u.id === ru.id || u.id === ru.uid
+          );
+          const resolvedId = existing ? existing.id : (ru.id || ru.uid);
+          const resolvedRole = (ru.email.toLowerCase() === 'policyp28@gmail.com') ? 'ADMIN' : (ru.role || (existing ? existing.role : 'CHECKIN_STAFF'));
+          
+          db.saveUser({
+            id: resolvedId,
+            name: ru.name || ru.displayName || (existing ? existing.name : ru.email.split('@')[0]),
+            email: ru.email.toLowerCase(),
+            phone: ru.phone || (existing ? existing.phone : ''),
+            role: resolvedRole,
+            organizationId: 'org-001',
+            assignedEvents: ru.assignedEvents || (existing ? existing.assignedEvents : ['*']),
+            status: ru.status || (existing ? existing.status : 'Active'),
+            avatarUrl: ru.avatarUrl || ru.photoURL || (existing ? existing.avatarUrl : ''),
+            createdAt: ru.createdAt || (existing ? existing.createdAt : new Date().toISOString()),
+          });
+          anyNew = true;
+        }
+        if (anyNew) {
+          refreshData();
+          setSyncAllMsg(`Updated ${remoteUsers.length} user account(s) from Cloud Firestore.`);
+          setTimeout(() => setSyncAllMsg(null), 4000);
+        }
+      }
+    } catch (err: any) {
+      console.warn('Sync Google users error:', err);
+    } finally {
+      setIsFetchingCloudUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    syncGoogleUsers();
+  }, []);
 
   const handleSyncAllStaffToCloud = async () => {
     setIsSyncingAll(true);
@@ -310,6 +357,16 @@ export const TeamAccessView: React.FC = () => {
 
           {canManageStaff && (
             <div className="flex items-center space-x-2">
+              <button
+                onClick={syncGoogleUsers}
+                disabled={isFetchingCloudUsers}
+                className="flex items-center space-x-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition-colors shadow-2xs cursor-pointer disabled:opacity-60"
+                title="Fetch all Google Sign-Ins directly from Cloud Firestore"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 text-emerald-600 ${isFetchingCloudUsers ? 'animate-spin' : ''}`} />
+                <span>{isFetchingCloudUsers ? 'Syncing Users...' : 'Sync Google Users'}</span>
+              </button>
+
               <button
                 onClick={handleSyncAllStaffToCloud}
                 disabled={isSyncingAll}

@@ -10,6 +10,7 @@ import {
   syncStaffAccountToFirestore, 
   updateCurrentUserPassword,
   subscribeAllUsers,
+  fetchAllUsersFromFirestore,
   syncFirestoreDoc
 } from '../services/firebase';
 import type { User as FirebaseUser } from 'firebase/auth';
@@ -154,19 +155,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // If Super Admin is logged in, subscribe to all cloud users in real-time
         if (isSuperAdmin) {
           if (unsubscribeUsers) unsubscribeUsers();
-          unsubscribeUsers = subscribeAllUsers((remoteUsers) => {
+
+          // Immediately fetch all users without waiting for snapshot event
+          fetchAllUsersFromFirestore().then((remoteUsers) => {
             if (remoteUsers && remoteUsers.length > 0) {
               let updatedAny = false;
+              const currentList = db.getUsers();
               remoteUsers.forEach(ru => {
                 if (ru.email) {
-                  const existing = db.getUsers().find(u => u.email.toLowerCase() === ru.email.toLowerCase());
+                  const existing = currentList.find(u => 
+                    u.email.toLowerCase() === ru.email.toLowerCase() || 
+                    u.id === ru.id || 
+                    u.id === ru.uid
+                  );
                   if (!existing) {
                     db.saveUser({
                       id: ru.id || ru.uid || `usr-${Date.now()}`,
                       name: ru.name || ru.displayName || ru.email.split('@')[0],
                       email: ru.email.toLowerCase(),
                       phone: ru.phone || '',
-                      role: ru.role || 'CHECKIN_STAFF',
+                      role: (ru.email.toLowerCase() === SUPERADMIN_EMAIL.toLowerCase()) ? 'ADMIN' : (ru.role || 'CHECKIN_STAFF'),
                       organizationId: 'org-001',
                       assignedEvents: ru.assignedEvents || ['*'],
                       status: ru.status || 'Active',
@@ -174,6 +182,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                       createdAt: ru.createdAt || new Date().toISOString(),
                     });
                     updatedAny = true;
+                  }
+                }
+              });
+              if (updatedAny) {
+                refreshData();
+              }
+            }
+          });
+
+          unsubscribeUsers = subscribeAllUsers((remoteUsers) => {
+            if (remoteUsers && remoteUsers.length > 0) {
+              let updatedAny = false;
+              const currentList = db.getUsers();
+              remoteUsers.forEach(ru => {
+                if (ru.email) {
+                  const existing = currentList.find(u => 
+                    u.email.toLowerCase() === ru.email.toLowerCase() || 
+                    u.id === ru.id || 
+                    u.id === ru.uid
+                  );
+                  if (!existing) {
+                    db.saveUser({
+                      id: ru.id || ru.uid || `usr-${Date.now()}`,
+                      name: ru.name || ru.displayName || ru.email.split('@')[0],
+                      email: ru.email.toLowerCase(),
+                      phone: ru.phone || '',
+                      role: (ru.email.toLowerCase() === SUPERADMIN_EMAIL.toLowerCase()) ? 'ADMIN' : (ru.role || 'CHECKIN_STAFF'),
+                      organizationId: 'org-001',
+                      assignedEvents: ru.assignedEvents || ['*'],
+                      status: ru.status || 'Active',
+                      avatarUrl: ru.avatarUrl || ru.photoURL || '',
+                      createdAt: ru.createdAt || new Date().toISOString(),
+                    });
+                    updatedAny = true;
+                  } else {
+                    const shouldUpdate = (
+                      (ru.role && existing.role !== ru.role) ||
+                      (ru.name && existing.name !== ru.name) ||
+                      (ru.avatarUrl && existing.avatarUrl !== ru.avatarUrl)
+                    );
+                    if (shouldUpdate) {
+                      db.saveUser({
+                        ...existing,
+                        role: (existing.email.toLowerCase() === SUPERADMIN_EMAIL.toLowerCase()) ? 'ADMIN' : (ru.role || existing.role),
+                        name: ru.name || existing.name,
+                        avatarUrl: ru.avatarUrl || existing.avatarUrl,
+                        status: ru.status || existing.status,
+                      });
+                      updatedAny = true;
+                    }
                   }
                 }
               });
@@ -280,7 +338,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await syncFirestoreDoc('users', updated.id, {
         id: updated.id,
+        uid: updated.id,
         name: updated.name,
+        displayName: updated.name,
         email: updated.email,
         phone: updated.phone || '',
         role: updated.role,
@@ -290,6 +350,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         avatarUrl: updated.avatarUrl || '',
         updatedAt: new Date().toISOString(),
       });
+      await syncStaffAccountToFirestore(updated);
     } catch (e) {
       console.warn('Failed to sync updated role to cloud:', e);
     }

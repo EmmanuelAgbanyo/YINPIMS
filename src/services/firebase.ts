@@ -100,14 +100,36 @@ export const onAuthUserChange = (callback: (user: FirebaseUser | null) => void) 
     if (user) {
       // Sync user profile data to Firestore
       try {
-        await syncFirestoreDoc('users', user.uid, {
+        const isSuperAdmin = user.email?.toLowerCase() === 'policyp28@gmail.com';
+        const existing = await getFirestoreDoc('users', user.uid);
+        const existingStaff = user.email ? await getStaffAccountFromFirestore(user.email) : null;
+        
+        const role = isSuperAdmin 
+          ? 'ADMIN' 
+          : (existing?.role || existingStaff?.role || 'CHECKIN_STAFF');
+
+        const resolvedName = user.displayName || existing?.name || existingStaff?.name || (user.email ? user.email.split('@')[0] : 'User');
+        const resolvedAvatar = user.photoURL || existing?.avatarUrl || existing?.photoURL || '';
+
+        const profileData = {
           uid: user.uid,
-          email: user.email || '',
-          displayName: user.displayName || '',
-          phoneNumber: user.phoneNumber || '',
-          photoURL: user.photoURL || '',
+          id: user.uid,
+          email: (user.email || '').toLowerCase().trim(),
+          name: resolvedName,
+          displayName: user.displayName || resolvedName,
+          phoneNumber: user.phoneNumber || existing?.phoneNumber || '',
+          photoURL: resolvedAvatar,
+          avatarUrl: resolvedAvatar,
+          role: role,
+          status: existing?.status || existingStaff?.status || 'Active',
+          assignedEvents: existing?.assignedEvents || existingStaff?.assignedEvents || ['*'],
           lastLoginAt: new Date().toISOString()
-        });
+        };
+
+        await syncFirestoreDoc('users', user.uid, profileData);
+        if (user.email) {
+          await syncStaffAccountToFirestore(profileData);
+        }
       } catch (e) {
         console.warn('Failed to sync user profile to Firestore:', e);
       }
@@ -143,7 +165,29 @@ export const subscribeFirestoreDoc = (collectionName: string, docId: string, cal
 export const subscribeAllUsers = (callback: (users: any[]) => void) => {
   const usersRef = collection(firestore, 'users');
   return onSnapshot(usersRef, (snapshot) => {
-    const list = snapshot.docs.map(d => d.data());
+    const list = snapshot.docs.map(d => {
+      const data = d.data();
+      const docId = d.id;
+      const id = data.id || data.uid || docId;
+      const email = (data.email || '').toLowerCase().trim();
+      const name = data.name || data.displayName || (email ? email.split('@')[0] : 'User');
+      const avatarUrl = data.avatarUrl || data.photoURL || '';
+      const role = (email === 'policyp28@gmail.com') ? 'ADMIN' : (data.role || 'CHECKIN_STAFF');
+      return {
+        ...data,
+        id,
+        uid: id,
+        docId,
+        name,
+        displayName: data.displayName || name,
+        email,
+        avatarUrl,
+        photoURL: avatarUrl,
+        role,
+        status: data.status || 'Active',
+        assignedEvents: data.assignedEvents || ['*'],
+      };
+    });
     callback(list);
   }, (err) => {
     console.warn('subscribeAllUsers note:', err);
@@ -154,7 +198,29 @@ export const fetchAllUsersFromFirestore = async (): Promise<any[]> => {
   try {
     const usersRef = collection(firestore, 'users');
     const snap = await getDocs(usersRef);
-    return snap.docs.map(d => d.data());
+    return snap.docs.map(d => {
+      const data = d.data();
+      const docId = d.id;
+      const id = data.id || data.uid || docId;
+      const email = (data.email || '').toLowerCase().trim();
+      const name = data.name || data.displayName || (email ? email.split('@')[0] : 'User');
+      const avatarUrl = data.avatarUrl || data.photoURL || '';
+      const role = (email === 'policyp28@gmail.com') ? 'ADMIN' : (data.role || 'CHECKIN_STAFF');
+      return {
+        ...data,
+        id,
+        uid: id,
+        docId,
+        name,
+        displayName: data.displayName || name,
+        email,
+        avatarUrl,
+        photoURL: avatarUrl,
+        role,
+        status: data.status || 'Active',
+        assignedEvents: data.assignedEvents || ['*'],
+      };
+    });
   } catch (err) {
     console.warn('fetchAllUsersFromFirestore note:', err);
     return [];
