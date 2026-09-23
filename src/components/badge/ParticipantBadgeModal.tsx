@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { toPng } from 'html-to-image';
 import type { Registration, Participant, Event, ParticipantBadgeType } from '../../types';
-import { X, Download, Printer, Copy, Check, ShieldCheck, Bed, Tag, ExternalLink, Building } from 'lucide-react';
+import { X, Download, Printer, Copy, Check, ShieldCheck, Bed, Tag, ExternalLink, Building, RectangleHorizontal, RectangleVertical } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { db } from '../../services/db';
 import { getPassUrl } from '../../utils/qrUtils';
@@ -44,6 +44,7 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
 
   const [copiedLink, setCopiedLink] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [badgeOrientation, setBadgeOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [currentBadgeType, setCurrentBadgeType] = useState<ParticipantBadgeType>(
     registration.badgeType || participant.badgeType || 'Delegate'
   );
@@ -101,7 +102,7 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
     try {
       const dataUrl = await toPng(badgeRef.current, { cacheBust: true, pixelRatio: 2 });
       const link = document.createElement('a');
-      link.download = `Badge_${currentBadgeType}_${participant.fullName.replace(/\s+/g, '_')}_${event.name.slice(0, 15)}.png`;
+      link.download = `Badge_${currentBadgeType}_${participant.fullName.replace(/\s+/g, '_')}_${badgeOrientation}.png`;
       link.href = dataUrl;
       link.click();
     } catch (err) {
@@ -155,7 +156,7 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
           }
 
           @page {
-            size: auto;
+            size: ${badgeOrientation === 'landscape' ? 'landscape' : 'portrait'};
             margin: 8mm;
           }
           *, *::before, *::after {
@@ -190,12 +191,9 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
           }
           .printable-badge-container {
             position: relative !important;
-            margin: 20mm auto !important;
             left: auto !important;
             top: auto !important;
             transform: none !important;
-            width: 90mm !important;
-            max-width: 90mm !important;
             border: 1px solid #E4E4E1 !important;
             box-shadow: none !important;
             background: #FFFFFF !important;
@@ -203,145 +201,299 @@ export const ParticipantBadgeModal: React.FC<ParticipantBadgeModalProps> = ({
             page-break-inside: avoid !important;
             break-inside: avoid !important;
           }
+          .printable-badge-container.portrait-badge {
+            margin: 20mm auto !important;
+            width: 90mm !important;
+            max-width: 90mm !important;
+          }
+          .printable-badge-container.landscape-badge {
+            margin: 15mm auto !important;
+            width: 145mm !important;
+            max-width: 145mm !important;
+          }
         }
       `}</style>
 
-      <div className="bg-[#FAFAF9] border border-[#E4E4E1] rounded-2xl shadow-2xl w-full max-w-md flex flex-col my-8 overflow-hidden">
+      <div className={`bg-[#FAFAF9] border border-[#E4E4E1] rounded-2xl shadow-2xl w-full ${badgeOrientation === 'landscape' ? 'max-w-2xl' : 'max-w-md'} flex flex-col my-8 overflow-hidden transition-all duration-200`}>
         {/* Header */}
         <div className="no-print flex items-center justify-between px-6 py-4 border-b border-[#E4E4E1] bg-white">
           <div>
             <h2 className="text-base font-bold text-[#1C1C1A] font-heading">
               Digital ID Card & Pass Badge
             </h2>
-            <p className="text-xs text-[#6B6B66]">Official event badge pass with title category.</p>
+            <p className="text-xs text-[#6B6B66]">Official event badge pass with title category and orientation options.</p>
           </div>
           <button onClick={onClose} className="h-8 w-8 text-[#6B6B66] hover:bg-[#FAFAF9] rounded-lg flex items-center justify-center cursor-pointer">
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Badge Title / Role Selector Bar */}
-        <div className="no-print p-4 bg-white border-b border-[#E4E4E1] space-y-2">
-          <label className="block text-xs font-bold text-[#1C1C1A] flex items-center space-x-1">
-            <Tag className="h-3.5 w-3.5 text-[#14595A]" />
-            <span>Select Participant Badge Title:</span>
-          </label>
-          <div className="flex flex-wrap gap-1.5">
-            {(['Delegate', 'Contestant', 'Speaker', 'Volunteer', 'Staff'] as ParticipantBadgeType[]).map(t => (
+        {/* Customization Toolbar: Orientation & Role Selection */}
+        <div className="no-print p-4 bg-white border-b border-[#E4E4E1] space-y-3">
+          {/* Orientation Selector */}
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-[#1C1C1A] flex items-center space-x-1.5">
+              <span>Card Orientation:</span>
+            </label>
+            <div className="inline-flex p-0.5 bg-[#FAFAF9] border border-[#E4E4E1] rounded-lg">
               <button
-                key={t}
-                onClick={() => handleBadgeTypeChange(t)}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  currentBadgeType === t
-                    ? `${getBadgeTitleTheme(t).bg} text-white shadow-2xs scale-105`
-                    : 'bg-[#FAFAF9] text-[#6B6B66] hover:text-[#1C1C1A] border border-[#E4E4E1]'
+                type="button"
+                onClick={() => setBadgeOrientation('portrait')}
+                className={`flex items-center space-x-1.5 px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                  badgeOrientation === 'portrait'
+                    ? 'bg-[#14595A] text-white shadow-2xs'
+                    : 'text-[#6B6B66] hover:text-[#1C1C1A]'
                 }`}
               >
-                {t}
+                <RectangleVertical className="h-3.5 w-3.5" />
+                <span>Portrait</span>
               </button>
-            ))}
+              <button
+                type="button"
+                onClick={() => setBadgeOrientation('landscape')}
+                className={`flex items-center space-x-1.5 px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                  badgeOrientation === 'landscape'
+                    ? 'bg-[#14595A] text-white shadow-2xs'
+                    : 'text-[#6B6B66] hover:text-[#1C1C1A]'
+                }`}
+              >
+                <RectangleHorizontal className="h-3.5 w-3.5" />
+                <span>Landscape</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Badge Title / Role Selector Bar */}
+          <div className="space-y-1.5 pt-2.5 border-t border-[#E4E4E1]">
+            <label className="block text-xs font-bold text-[#1C1C1A] flex items-center space-x-1">
+              <Tag className="h-3.5 w-3.5 text-[#14595A]" />
+              <span>Select Participant Badge Title:</span>
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {(['Delegate', 'Contestant', 'Speaker', 'Volunteer', 'Staff'] as ParticipantBadgeType[]).map(t => (
+                <button
+                  key={t}
+                  onClick={() => handleBadgeTypeChange(t)}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    currentBadgeType === t
+                      ? `${getBadgeTitleTheme(t).bg} text-white shadow-2xs scale-105`
+                      : 'bg-[#FAFAF9] text-[#6B6B66] hover:text-[#1C1C1A] border border-[#E4E4E1]'
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         {/* Badge Card Container */}
         <div className="p-6 flex flex-col items-center justify-center space-y-4">
-          {/* Printable Badge Target */}
-          <div
-            ref={badgeRef}
-            className="printable-badge-container w-full max-w-sm bg-white border-2 border-[#E4E4E1] rounded-2xl shadow-xl overflow-hidden relative"
-          >
-            {/* Badge Top Header */}
-            <div className="bg-[#14595A] text-white p-4 text-center space-y-1" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-              <div className="flex items-center justify-center space-x-1 text-[10px] font-bold uppercase tracking-widest text-white/80">
-                <ShieldCheck className="h-3.5 w-3.5" />
-                <span>Verified Official Pass</span>
-              </div>
-              <h3 className="font-heading font-bold text-sm leading-tight text-white px-2">
-                {event.name}
-              </h3>
-              <p className="text-[11px] text-white/80 font-medium">
-                {new Date(event.startDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-              </p>
-            </div>
-
-            {/* Prominent Badge Title / Role Banner */}
-            <div 
-              className={`w-full py-2 text-center text-xs font-extrabold font-heading tracking-widest uppercase shadow-xs ${theme.bg} ${theme.text}`}
-              style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}
+          {badgeOrientation === 'portrait' ? (
+            /* PORTRAIT BADGE TARGET */
+            <div
+              ref={badgeRef}
+              className="printable-badge-container portrait-badge w-full max-w-sm bg-white border-2 border-[#E4E4E1] rounded-2xl shadow-xl overflow-hidden relative"
             >
-              ★ {theme.label} ★
-            </div>
-
-            {/* Badge Body */}
-            <div className="p-6 text-center space-y-4 bg-white">
-              {/* Participant Name & Organization / Institution */}
-              <div>
-                <h2 className="font-heading font-bold text-xl text-[#1C1C1A] tracking-tight">
-                  {participant.fullName}
-                </h2>
-                {effectiveInstitution && (
-                  <div className="mt-1.5 inline-flex items-center justify-center space-x-1.5 px-3 py-1 bg-[#EBF4F4] text-[#14595A] rounded-full border border-[#14595A]/20" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                    <Building className="h-3.5 w-3.5 shrink-0" />
-                    <span className="text-xs font-bold uppercase tracking-wider">{effectiveInstitution}</span>
-                  </div>
-                )}
-                {participant.jobTitle && (
-                  <p className="text-[11px] text-[#6B6B66] mt-1 font-medium">
-                    {participant.jobTitle}
-                  </p>
-                )}
-              </div>
-
-              {/* QR Code Centerpiece */}
-              <div className="space-y-1.5">
-                <a
-                  href={passUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-[#FAFAF9] p-3 rounded-xl border border-[#E4E4E1] inline-block shadow-2xs hover:border-[#14595A] hover:shadow-md transition-all cursor-pointer group"
-                  style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}
-                  title="Click to open and test live mobile pass view"
-                >
-                  <QRCodeSVG
-                    value={passUrl}
-                    size={140}
-                    level="H"
-                    includeMargin={true}
-                  />
-                  <div className="no-print mt-1.5 flex items-center justify-center space-x-1 text-[10px] font-bold text-[#14595A] group-hover:underline">
-                    <ExternalLink className="h-3 w-3" />
-                    <span>Click to Test Pass</span>
-                  </div>
-                </a>
-              </div>
-
-              {/* Registration ID & Room details */}
-              <div className="space-y-1">
-                <div className="text-[10px] font-bold text-[#6B6B66] uppercase tracking-wider">
-                  Registration Pass ID
+              {/* Badge Top Header */}
+              <div className="bg-[#14595A] text-white p-4 text-center space-y-1" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                <div className="flex items-center justify-center space-x-1 text-[10px] font-bold uppercase tracking-widest text-white/80">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  <span>Verified Official Pass</span>
                 </div>
-                <div className="text-xs font-mono font-bold text-[#1C1C1A] tracking-wider tabular-nums">
-                  {registration.id}
+                <h3 className="font-heading font-bold text-sm leading-tight text-white px-2">
+                  {event.name}
+                </h3>
+                <p className="text-[11px] text-white/80 font-medium">
+                  {new Date(event.startDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                </p>
+              </div>
+
+              {/* Prominent Badge Title / Role Banner */}
+              <div 
+                className={`w-full py-2 text-center text-xs font-extrabold font-heading tracking-widest uppercase shadow-xs ${theme.bg} ${theme.text}`}
+                style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}
+              >
+                ★ {theme.label} ★
+              </div>
+
+              {/* Badge Body */}
+              <div className="p-6 text-center space-y-4 bg-white">
+                {/* Participant Name & Organization / Institution */}
+                <div>
+                  <h2 className="font-heading font-bold text-xl text-[#1C1C1A] tracking-tight">
+                    {participant.fullName}
+                  </h2>
+                  {effectiveInstitution && (
+                    <div className="mt-1.5 inline-flex items-center justify-center space-x-1.5 px-3 py-1 bg-[#EBF4F4] text-[#14595A] rounded-full border border-[#14595A]/20" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                      <Building className="h-3.5 w-3.5 shrink-0" />
+                      <span className="text-xs font-bold uppercase tracking-wider">{effectiveInstitution}</span>
+                    </div>
+                  )}
+                  {participant.jobTitle && (
+                    <p className="text-[11px] text-[#6B6B66] mt-1 font-medium">
+                      {participant.jobTitle}
+                    </p>
+                  )}
                 </div>
 
-                {room && (
-                  <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-[#EBF4F4] text-[#14595A] text-xs font-bold mt-2" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                    <Bed className="h-3.5 w-3.5" />
-                    <span>Assigned Room: {room.roomNumber}</span>
+                {/* QR Code Centerpiece */}
+                <div className="space-y-1.5">
+                  <a
+                    href={passUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-[#FAFAF9] p-3 rounded-xl border border-[#E4E4E1] inline-block shadow-2xs hover:border-[#14595A] hover:shadow-md transition-all cursor-pointer group"
+                    style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}
+                    title="Click to open and test live mobile pass view"
+                  >
+                    <QRCodeSVG
+                      value={passUrl}
+                      size={140}
+                      level="H"
+                      includeMargin={true}
+                    />
+                    <div className="no-print mt-1.5 flex items-center justify-center space-x-1 text-[10px] font-bold text-[#14595A] group-hover:underline">
+                      <ExternalLink className="h-3 w-3" />
+                      <span>Click to Test Pass</span>
+                    </div>
+                  </a>
+                </div>
+
+                {/* Registration ID & Room details */}
+                <div className="space-y-1">
+                  <div className="text-[10px] font-bold text-[#6B6B66] uppercase tracking-wider">
+                    Registration Pass ID
                   </div>
-                )}
+                  <div className="text-xs font-mono font-bold text-[#1C1C1A] tracking-wider tabular-nums">
+                    {registration.id}
+                  </div>
+
+                  {room && (
+                    <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-[#EBF4F4] text-[#14595A] text-xs font-bold mt-2" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                      <Bed className="h-3.5 w-3.5" />
+                      <span>Assigned Room: {room.roomNumber}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Badge Footer */}
+              <div className="bg-[#FAFAF9] px-4 py-2.5 border-t border-[#E4E4E1] flex items-center justify-between text-[10px] text-[#6B6B66]" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                <span className="font-semibold">PIMS ID Pass System</span>
+                <span className="font-semibold text-[#2F7D4F] flex items-center space-x-1">
+                  <span className="h-2 w-2 rounded-full bg-[#2F7D4F]" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }} />
+                  <span>ACTIVE</span>
+                </span>
               </div>
             </div>
+          ) : (
+            /* LANDSCAPE BADGE TARGET */
+            <div
+              ref={badgeRef}
+              className="printable-badge-container landscape-badge w-full max-w-xl bg-white border-2 border-[#E4E4E1] rounded-2xl shadow-xl overflow-hidden relative"
+            >
+              {/* Badge Top Header */}
+              <div className="bg-[#14595A] text-white px-5 py-2.5 flex items-center justify-between" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                <div className="flex items-center space-x-2 text-[10px] font-bold uppercase tracking-widest text-white/90">
+                  <ShieldCheck className="h-3.5 w-3.5 text-white shrink-0" />
+                  <span>Verified Official Pass</span>
+                  <span className="text-white/40">•</span>
+                  <span className="font-heading font-bold text-xs truncate max-w-[260px] text-white">{event.name}</span>
+                </div>
+                <p className="text-[11px] text-white/80 font-medium shrink-0">
+                  {new Date(event.startDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                </p>
+              </div>
 
-            {/* Badge Footer */}
-            <div className="bg-[#FAFAF9] px-4 py-2.5 border-t border-[#E4E4E1] flex items-center justify-between text-[10px] text-[#6B6B66]" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-              <span className="font-semibold">PIMS ID Pass System</span>
-              <span className="font-semibold text-[#2F7D4F] flex items-center space-x-1">
-                <span className="h-2 w-2 rounded-full bg-[#2F7D4F]" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }} />
-                <span>ACTIVE</span>
-              </span>
+              {/* Prominent Badge Title / Role Banner */}
+              <div 
+                className={`w-full py-1.5 px-5 flex items-center justify-between text-xs font-extrabold font-heading tracking-widest uppercase shadow-xs ${theme.bg} ${theme.text}`}
+                style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}
+              >
+                <span>★ {theme.label} ★</span>
+                <span className="text-[10px] opacity-90 font-mono tracking-normal">YIN-PIMS OFFICIAL PASS</span>
+              </div>
+
+              {/* Badge Body: 2-Column Horizontal Split */}
+              <div className="p-5 bg-white grid grid-cols-12 gap-5 items-center">
+                {/* Left Column: QR Code & ID */}
+                <div className="col-span-5 flex flex-col items-center justify-center space-y-2 border-r border-[#E4E4E1] pr-3">
+                  <a
+                    href={passUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-[#FAFAF9] p-2.5 rounded-xl border border-[#E4E4E1] inline-block shadow-2xs hover:border-[#14595A] hover:shadow-md transition-all cursor-pointer group"
+                    style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}
+                    title="Click to open and test live mobile pass view"
+                  >
+                    <QRCodeSVG
+                      value={passUrl}
+                      size={115}
+                      level="H"
+                      includeMargin={true}
+                    />
+                    <div className="no-print mt-1 flex items-center justify-center space-x-1 text-[9px] font-bold text-[#14595A] group-hover:underline">
+                      <ExternalLink className="h-2.5 w-2.5" />
+                      <span>Test Pass</span>
+                    </div>
+                  </a>
+
+                  <div className="text-center">
+                    <div className="text-[9px] font-bold text-[#6B6B66] uppercase tracking-wider">
+                      Pass ID
+                    </div>
+                    <div className="text-xs font-mono font-bold text-[#1C1C1A] tracking-wider tabular-nums">
+                      {registration.id}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column: Participant Details */}
+                <div className="col-span-7 flex flex-col justify-center space-y-2.5 text-left pl-1">
+                  <div>
+                    <h2 className="font-heading font-extrabold text-2xl text-[#1C1C1A] tracking-tight uppercase leading-snug">
+                      {participant.fullName}
+                    </h2>
+
+                    {effectiveInstitution && (
+                      <div className="mt-1.5 inline-flex items-center space-x-1.5 px-3 py-1 bg-[#EBF4F4] text-[#14595A] rounded-full border border-[#14595A]/20 max-w-full" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                        <Building className="h-3.5 w-3.5 shrink-0" />
+                        <span className="text-xs font-bold uppercase tracking-wider truncate">{effectiveInstitution}</span>
+                      </div>
+                    )}
+
+                    {participant.jobTitle && (
+                      <p className="text-xs text-[#6B6B66] mt-1 font-medium truncate">
+                        {participant.jobTitle}
+                      </p>
+                    )}
+                  </div>
+
+                  {room && (
+                    <div className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-[#EBF4F4] text-[#14595A] text-xs font-bold w-fit" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                      <Bed className="h-3.5 w-3.5 shrink-0" />
+                      <span>Room {room.roomNumber} ({room.genderGroup} Wing)</span>
+                    </div>
+                  )}
+
+                  <div className="pt-1 flex items-center space-x-1.5 text-[11px] font-semibold text-[#2F7D4F]" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                    <span className="h-2 w-2 rounded-full bg-[#2F7D4F]" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }} />
+                    <span>Verified Active Credential</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Badge Footer */}
+              <div className="bg-[#FAFAF9] px-5 py-2.5 border-t border-[#E4E4E1] flex items-center justify-between text-[10px] text-[#6B6B66]" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                <span className="font-semibold">Young Investors Network — PIMS ID System</span>
+                <span className="font-semibold text-[#2F7D4F] flex items-center space-x-1">
+                  <span className="h-2 w-2 rounded-full bg-[#2F7D4F]" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }} />
+                  <span>ACTIVE</span>
+                </span>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Badge Action Buttons */}
           <div className="no-print flex flex-wrap items-center justify-center gap-2 w-full pt-2">
