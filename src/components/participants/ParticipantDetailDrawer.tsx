@@ -142,6 +142,7 @@ export const ParticipantDetailDrawer: React.FC<ParticipantDetailDrawerProps> = (
                   <option value="Speaker">Speaker</option>
                   <option value="Volunteer">Volunteer</option>
                   <option value="Staff">Staff</option>
+                  <option value="Coordinator">Coordinator</option>
                 </select>
                 <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded text-white ${
                   getBadgeTitleTheme(participant.badgeType || 'Delegate').bg

@@ -1087,6 +1087,7 @@ export const CheckInView: React.FC<CheckInViewProps> = ({ filterEventId }) => {
                       <option value="Volunteer">Volunteer</option>
                       <option value="Contestant">Contestant</option>
                       <option value="Staff">Staff</option>
+                      <option value="Coordinator">Coordinator</option>
                     </select>
                   </div>
                 </div>

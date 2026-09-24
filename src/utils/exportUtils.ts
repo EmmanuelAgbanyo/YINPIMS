@@ -1,9 +1,10 @@
 import type { DatabaseSchema } from '../services/db';
-import type { Participant } from '../types';
+import type { Participant, Registration } from '../types';
 
 export interface ParticipantExportRow {
   participantId: string;
   fullName: string;
+  designatedTitle: string;
   email: string;
   phone: string;
   gender: string;
@@ -19,10 +20,46 @@ export interface ParticipantExportRow {
   qrIdentifier: string;
 }
 
+/**
+ * Resolves the designated title/role for a participant based on registration,
+ * participant profile, user team roles, or job title indications.
+ */
+export const resolveParticipantTitle = (
+  p: Participant,
+  reg?: Registration,
+  users?: DatabaseSchema['users']
+): string => {
+  if (reg?.badgeType) return reg.badgeType;
+  if (p.badgeType) return p.badgeType;
+
+  // Check if participant is a user with a coordinator or staff role
+  if (users && p.email) {
+    const userMatch = users.find(u => u.email.toLowerCase() === p.email.toLowerCase());
+    if (userMatch) {
+      if (userMatch.role === 'EVENT_COORDINATOR') return 'Coordinator';
+      if (userMatch.role === 'CHECKIN_STAFF' || userMatch.role === 'ADMIN') return 'Staff';
+    }
+  }
+
+  // Infer from job title keywords if present
+  if (p.jobTitle) {
+    const jt = p.jobTitle.toLowerCase();
+    if (jt.includes('coordinator')) return 'Coordinator';
+    if (jt.includes('contestant') || jt.includes('competitor')) return 'Contestant';
+    if (jt.includes('volunteer')) return 'Volunteer';
+    if (jt.includes('speaker') || jt.includes('panelist') || jt.includes('keynote')) return 'Speaker';
+    if (jt.includes('staff') || jt.includes('organizer') || jt.includes('admin')) return 'Staff';
+  }
+
+  return 'Delegate';
+};
+
 export const generateParticipantExportData = (
   data: DatabaseSchema,
   targetEventId: string = 'all',
-  filteredParticipants?: Participant[]
+  filteredParticipants?: Participant[],
+  titleFilter: string = 'all',
+  checkInStatusFilter: string = 'all'
 ): ParticipantExportRow[] => {
   const participantsToExport = filteredParticipants || data.participants;
   const rows: ParticipantExportRow[] = [];
@@ -37,12 +74,25 @@ export const generateParticipantExportData = (
 
     if (matchingRegs.length > 0) {
       matchingRegs.forEach(reg => {
+        const title = resolveParticipantTitle(p, reg, data.users);
+
+        // Filter by designated title
+        if (titleFilter !== 'all' && title.toLowerCase() !== titleFilter.toLowerCase()) {
+          return;
+        }
+
+        // Filter by check-in / attendance status
+        if (checkInStatusFilter !== 'all' && reg.checkInStatus !== checkInStatusFilter) {
+          return;
+        }
+
         const event = data.events.find(e => e.id === reg.eventId);
         const room = data.rooms.find(rm => rm.id === reg.roomAssignmentId);
 
         rows.push({
           participantId: p.id,
           fullName: p.fullName,
+          designatedTitle: title,
           email: p.email,
           phone: p.phone || '',
           gender: p.gender || '',
@@ -59,10 +109,20 @@ export const generateParticipantExportData = (
         });
       });
     } else if (targetEventId === 'all') {
-      // Participant has no active registration yet
+      const title = resolveParticipantTitle(p, undefined, data.users);
+
+      if (titleFilter !== 'all' && title.toLowerCase() !== titleFilter.toLowerCase()) {
+        return;
+      }
+
+      if (checkInStatusFilter !== 'all') {
+        return;
+      }
+
       rows.push({
         participantId: p.id,
         fullName: p.fullName,
+        designatedTitle: title,
         email: p.email,
         phone: p.phone || '',
         gender: p.gender || '',
@@ -87,18 +147,21 @@ export const exportParticipantsCSV = (
   data: DatabaseSchema,
   targetEventId: string = 'all',
   filteredParticipants?: Participant[],
-  customFilename?: string
+  customFilename?: string,
+  titleFilter: string = 'all',
+  checkInStatusFilter: string = 'all'
 ) => {
-  const rows = generateParticipantExportData(data, targetEventId, filteredParticipants);
+  const rows = generateParticipantExportData(data, targetEventId, filteredParticipants, titleFilter, checkInStatusFilter);
 
   if (rows.length === 0) {
-    alert('No participants found to export.');
+    alert(`No participants found matching the selected export filters (Title: ${titleFilter}, Event: ${targetEventId === 'all' ? 'All' : targetEventId}).`);
     return;
   }
 
   const headers = [
     'Participant ID',
     'Full Name',
+    'Designated Title / Role',
     'Email Address',
     'Phone Number',
     'Gender',
@@ -121,6 +184,7 @@ export const exportParticipantsCSV = (
     const values = [
       `"${row.participantId.replace(/"/g, '""')}"`,
       `"${row.fullName.replace(/"/g, '""')}"`,
+      `"${row.designatedTitle.replace(/"/g, '""')}"`,
       `"${row.email.replace(/"/g, '""')}"`,
       `"${row.phone.replace(/"/g, '""')}"`,
       `"${row.gender.replace(/"/g, '""')}"`,
@@ -144,7 +208,8 @@ export const exportParticipantsCSV = (
   
   const eventObj = targetEventId !== 'all' ? data.events.find(e => e.id === targetEventId) : null;
   const eventSanitized = eventObj ? eventObj.name.replace(/[^a-zA-Z0-9]/g, '_') : 'All_Events';
-  const fileName = customFilename || `PIMS_Participants_${eventSanitized}_${new Date().toISOString().split('T')[0]}.csv`;
+  const titleSanitized = titleFilter !== 'all' ? `_${titleFilter}` : '';
+  const fileName = customFilename || `PIMS_Participants_${eventSanitized}${titleSanitized}_${new Date().toISOString().split('T')[0]}.csv`;
 
   const link = document.createElement('a');
   link.setAttribute('href', url);
@@ -158,12 +223,14 @@ export const exportParticipantsJSON = (
   data: DatabaseSchema,
   targetEventId: string = 'all',
   filteredParticipants?: Participant[],
-  customFilename?: string
+  customFilename?: string,
+  titleFilter: string = 'all',
+  checkInStatusFilter: string = 'all'
 ) => {
-  const rows = generateParticipantExportData(data, targetEventId, filteredParticipants);
+  const rows = generateParticipantExportData(data, targetEventId, filteredParticipants, titleFilter, checkInStatusFilter);
 
   if (rows.length === 0) {
-    alert('No participants found to export.');
+    alert(`No participants found matching the selected export filters (Title: ${titleFilter}, Event: ${targetEventId === 'all' ? 'All' : targetEventId}).`);
     return;
   }
 
@@ -173,7 +240,8 @@ export const exportParticipantsJSON = (
 
   const eventObj = targetEventId !== 'all' ? data.events.find(e => e.id === targetEventId) : null;
   const eventSanitized = eventObj ? eventObj.name.replace(/[^a-zA-Z0-9]/g, '_') : 'All_Events';
-  const fileName = customFilename || `PIMS_Participants_${eventSanitized}_${new Date().toISOString().split('T')[0]}.json`;
+  const titleSanitized = titleFilter !== 'all' ? `_${titleFilter}` : '';
+  const fileName = customFilename || `PIMS_Participants_${eventSanitized}${titleSanitized}_${new Date().toISOString().split('T')[0]}.json`;
 
   const link = document.createElement('a');
   link.setAttribute('href', url);

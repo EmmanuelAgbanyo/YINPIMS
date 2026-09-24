@@ -29,7 +29,7 @@ import { CheckInView } from '../checkin/CheckInView';
 import { CommunicationsView } from '../communications/CommunicationsView';
 import { WaitlistManagerModal } from '../waitlist/WaitlistManagerModal';
 import { BatchBadgePrintModal } from '../badge/BatchBadgePrintModal';
-import { exportParticipantsCSV } from '../../utils/exportUtils';
+import { ParticipantExportModal } from '../participants/ParticipantExportModal';
 
 interface EventDetailModalProps {
   isOpen: boolean;
@@ -59,6 +59,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const [activeTab, setActiveTab] = useState<EventTab>('overview');
   const [isBatchPrintOpen, setIsBatchPrintOpen] = useState(false);
   const [isManageStaffOpen, setIsManageStaffOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   if (!isOpen) return null;
 
@@ -164,12 +165,12 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           {/* Quick Header Controls */}
           <div className="flex items-center space-x-2 shrink-0 self-end md:self-auto">
             <button
-              onClick={() => exportParticipantsCSV(data, event.id)}
-              title="Download full participant directory CSV for this event"
+              onClick={() => setIsExportModalOpen(true)}
+              title="Download or filter participant directory by title, role, or attendance"
               className="h-8 px-2.5 bg-white border border-[#E4E4E1] text-[#2F7D4F] text-xs font-semibold rounded-md hover:bg-[#F0F9F3] transition-colors cursor-pointer flex items-center space-x-1"
             >
               <Download className="h-3.5 w-3.5 text-[#2F7D4F]" />
-              <span>Export CSV</span>
+              <span>Export</span>
             </button>
 
             <button
@@ -684,6 +685,13 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           </div>
         </div>
       )}
+
+      {/* Filtered Export Modal */}
+      <ParticipantExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        initialEventId={event.id}
+      />
     </div>
   );
 };

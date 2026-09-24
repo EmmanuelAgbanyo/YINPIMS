@@ -313,6 +313,7 @@ export const EditParticipantModal: React.FC<EditParticipantModalProps> = ({
                   <option value="Speaker">Speaker</option>
                   <option value="Volunteer">Volunteer</option>
                   <option value="Staff">Staff</option>
+                  <option value="Coordinator">Coordinator</option>
                 </select>
 
                 <div className="shrink-0 flex items-center space-x-1.5">

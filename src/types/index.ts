@@ -73,7 +73,7 @@ export interface RegistrationQuestion {
   isSystemQuestion?: boolean; // e.g. Accommodation or Gender auto-added
 }
 
-export type ParticipantBadgeType = 'Delegate' | 'Contestant' | 'Speaker' | 'Volunteer' | 'Staff';
+export type ParticipantBadgeType = 'Delegate' | 'Contestant' | 'Speaker' | 'Volunteer' | 'Staff' | 'Coordinator';
 export type RegistrationStatus = 'Confirmed' | 'Waitlisted' | 'Cancelled';
 export type CheckInStatus = 'Not Checked In' | 'Checked In';
 

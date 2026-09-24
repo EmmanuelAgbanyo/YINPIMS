@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { useApp } from '../../context/AppContext';
 import { getPassUrl } from '../../utils/qrUtils';
+import { getBadgeTitleTheme } from './ParticipantBadgeModal';
 import type { Participant, Registration, Event } from '../../types';
 import {
   X,
@@ -547,7 +548,8 @@ export const BatchBadgePrintModal: React.FC<BatchBadgePrintModalProps> = ({
                       return '';
                     })();
 
-                    const badgeRoleTitle = reg.badgeType || participant.badgeType || 'DELEGATE';
+                    const theme = getBadgeTitleTheme((reg.badgeType || participant.badgeType) as any);
+                    const badgeRoleTitle = theme.label;
 
                     return badgeOrientation === 'portrait' ? (
                       /* PORTRAIT BADGE CARD */
@@ -574,12 +576,7 @@ export const BatchBadgePrintModal: React.FC<BatchBadgePrintModalProps> = ({
 
                         {/* Prominent Badge Title Category Banner */}
                         <div 
-                          className={`w-full py-1 text-center text-[9px] font-extrabold font-heading tracking-widest uppercase shadow-2xs ${
-                            reg.badgeType === 'Speaker' ? 'bg-amber-600 text-white' :
-                            reg.badgeType === 'Contestant' ? 'bg-purple-600 text-white' :
-                            reg.badgeType === 'Volunteer' ? 'bg-emerald-600 text-white' :
-                            reg.badgeType === 'Staff' ? 'bg-[#14595A] text-white' : 'bg-slate-800 text-white'
-                          }`}
+                          className={`w-full py-1 text-center text-[9px] font-extrabold font-heading tracking-widest uppercase shadow-2xs ${theme.bg} ${theme.text}`}
                           style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}
                         >
                           ★ {badgeRoleTitle} ★
@@ -632,8 +629,9 @@ export const BatchBadgePrintModal: React.FC<BatchBadgePrintModalProps> = ({
                         {/* Badge Footer */}
                         <div className="bg-[#FAFAF9] px-2.5 py-1 rounded border-t border-[#E4E4E1] flex items-center justify-between text-[9px] text-[#6B6B66]" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
                           <span>YIN-PIMS System</span>
-                          <span className="font-bold text-[#2F7D4F] uppercase tracking-wider text-[8px]" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                            {reg.checkInStatus === 'Checked In' ? 'Checked In' : 'VERIFIED'}
+                          <span className="font-bold text-[#2F7D4F] uppercase tracking-wider text-[8px] flex items-center space-x-1" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            <span className="h-1.5 w-1.5 rounded-full bg-[#2F7D4F]" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }} />
+                            <span>{reg.checkInStatus === 'Checked In' ? 'Checked In' : 'VERIFIED'}</span>
                           </span>
                         </div>
                       </div>
@@ -641,7 +639,7 @@ export const BatchBadgePrintModal: React.FC<BatchBadgePrintModalProps> = ({
                       /* LANDSCAPE BADGE CARD */
                       <div
                         key={reg.id}
-                        className="badge-print-card bg-white border-2 border-dashed border-[#D5D5D1] rounded-lg overflow-hidden flex flex-col justify-between relative p-2.5 transition-shadow hover:border-[#14595A]"
+                        className="badge-print-card bg-white border-2 border-dashed border-[#D5D5D1] rounded-lg overflow-hidden flex flex-col justify-between relative p-3 transition-shadow hover:border-[#14595A]"
                       >
                         {/* Cut corners guide markings */}
                         <div className="absolute top-1 left-1 text-[8px] text-[#A3A39E] flex items-center space-x-0.5 no-print">
@@ -650,88 +648,81 @@ export const BatchBadgePrintModal: React.FC<BatchBadgePrintModalProps> = ({
                         </div>
 
                         {/* Badge Top Header */}
-                        <div className="bg-[#14595A] text-white px-2.5 py-1 rounded-md flex items-center justify-between" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          <div className="flex items-center space-x-1.5 text-[8px] font-bold uppercase tracking-wider text-white/90 truncate mr-2">
-                            <ShieldCheck className="h-2.5 w-2.5 shrink-0" />
+                        <div className="bg-[#14595A] text-white px-3 py-1.5 rounded-md text-center space-y-0.5" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                          <div className="flex items-center justify-center space-x-1.5 text-[8px] font-bold uppercase tracking-wider text-white/80">
+                            <ShieldCheck className="h-2.5 w-2.5" />
                             <span>Official Pass</span>
                             <span className="text-white/40">•</span>
-                            <span className="font-heading font-bold text-[10px] text-white truncate max-w-[180px]">{event.name}</span>
+                            <span>{new Date(event.startDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                           </div>
-                          <span className="text-[8px] text-white/80 shrink-0 font-medium">
-                            {new Date(event.startDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </span>
+                          <h3 className="font-heading font-bold text-[12px] leading-tight text-white line-clamp-1 px-1">
+                            {event.name}
+                          </h3>
                         </div>
 
                         {/* Prominent Badge Title Category Banner */}
                         <div 
-                          className={`w-full py-0.5 px-2.5 flex items-center justify-between text-[8px] font-extrabold font-heading tracking-widest uppercase shadow-2xs my-0.5 ${
-                            reg.badgeType === 'Speaker' ? 'bg-amber-600 text-white' :
-                            reg.badgeType === 'Contestant' ? 'bg-purple-600 text-white' :
-                            reg.badgeType === 'Volunteer' ? 'bg-emerald-600 text-white' :
-                            reg.badgeType === 'Staff' ? 'bg-[#14595A] text-white' : 'bg-slate-800 text-white'
-                          }`}
+                          className={`w-full py-1 text-center text-[9px] font-extrabold font-heading tracking-widest uppercase shadow-2xs my-0.5 ${theme.bg} ${theme.text}`}
                           style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}
                         >
-                          <span>★ {badgeRoleTitle} ★</span>
-                          <span className="text-[7px] opacity-90 font-mono tracking-normal">YIN-PIMS OFFICIAL PASS</span>
+                          ★ {badgeRoleTitle} ★
                         </div>
 
                         {/* Badge Main Body: 2-Column Split */}
-                        <div className="py-1 px-1 flex-1 grid grid-cols-12 gap-2.5 items-center">
-                          {/* Left Col: QR Code & ID */}
-                          <div className="col-span-4 flex flex-col items-center justify-center space-y-1 border-r border-[#E4E4E1] pr-2">
-                            <div className="bg-[#FAFAF9] p-1.5 rounded-md border border-[#E4E4E1] inline-block shadow-2xs" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                              <QRCodeSVG
-                                value={getPassUrl(reg.qrIdentifier, { registration: reg, participant, event })}
-                                size={76}
-                                level="H"
-                                includeMargin={false}
-                              />
-                            </div>
-                            <div className="text-center">
-                              <div className="text-[7px] font-bold text-[#6B6B66] uppercase tracking-wider">Pass ID</div>
-                              <div className="text-[9px] font-mono font-bold text-[#1C1C1A]">{reg.id}</div>
-                            </div>
-                          </div>
-
-                          {/* Right Col: Details */}
-                          <div className="col-span-8 flex flex-col justify-center space-y-1 pl-1 text-left">
+                        <div className="py-1 px-2 flex-1 flex items-center justify-between gap-4">
+                          {/* Left Col: Details */}
+                          <div className="flex-1 min-w-0 flex flex-col justify-center space-y-1.5 text-left">
                             <div>
-                              <h2 className="font-heading font-bold text-xs sm:text-sm text-[#1C1C1A] tracking-tight uppercase leading-snug line-clamp-1">
+                              <h2 className="font-heading font-bold text-sm text-[#1C1C1A] tracking-tight leading-snug line-clamp-1">
                                 {participant.fullName}
                               </h2>
                               {effectiveOrg && (
-                                <div className="mt-0.5 inline-flex items-center space-x-1 px-2 py-0.5 bg-[#EBF4F4] text-[#14595A] rounded-full border border-[#14595A]/20 max-w-full" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                                <div className="mt-1 inline-flex items-center space-x-1 px-2 py-0.5 bg-[#EBF4F4] text-[#14595A] rounded-full border border-[#14595A]/20 max-w-full" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
                                   <Building className="h-2.5 w-2.5 shrink-0" />
-                                  <span className="text-[8px] font-bold uppercase tracking-wider truncate">{effectiveOrg}</span>
+                                  <span className="text-[9px] font-bold uppercase tracking-wider truncate">{effectiveOrg}</span>
                                 </div>
                               )}
                               {participant.jobTitle && (
-                                <p className="text-[8px] text-[#6B6B66] line-clamp-1 mt-0.5">
+                                <p className="text-[9px] text-[#6B6B66] line-clamp-1 mt-0.5 font-medium">
                                   {participant.jobTitle}
                                 </p>
                               )}
                             </div>
 
-                            {room && (
-                              <div className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-[#EBF4F4] text-[#14595A] text-[8px] font-bold w-fit" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                                <Bed className="h-2.5 w-2.5 shrink-0" />
-                                <span>Room: {room.roomNumber}</span>
+                            <div className="space-y-1 pt-1.5 border-t border-[#F0F0EE]">
+                              <div className="text-[8px] font-bold text-[#6B6B66] uppercase tracking-wider">
+                                Pass ID: <span className="font-mono text-[#1C1C1A] text-[9px] font-bold">{reg.id}</span>
                               </div>
-                            )}
 
-                            <div className="flex items-center space-x-1 text-[8px] font-semibold text-[#2F7D4F]" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                              <span className="h-1.5 w-1.5 rounded-full bg-[#2F7D4F]" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }} />
-                              <span>Verified Active Credential</span>
+                              {room && (
+                                <div className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-[#EBF4F4] text-[#14595A] text-[8px] font-bold w-fit" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                                  <Bed className="h-2.5 w-2.5 shrink-0" />
+                                  <span>Room: {room.roomNumber}</span>
+                                </div>
+                              )}
                             </div>
+                          </div>
+
+                          {/* Right Col: QR Code */}
+                          <div className="shrink-0 flex flex-col items-center justify-center pl-3 border-l border-[#E4E4E1]">
+                            <div className="bg-[#FAFAF9] p-2 rounded-lg border border-[#E4E4E1] inline-block shadow-2xs" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                              <QRCodeSVG
+                                value={getPassUrl(reg.qrIdentifier, { registration: reg, participant, event })}
+                                size={88}
+                                level="H"
+                                includeMargin={false}
+                              />
+                            </div>
+                            <span className="text-[7px] text-[#6B6B66] font-mono mt-1 uppercase tracking-wider font-semibold">SCAN TO VERIFY</span>
                           </div>
                         </div>
 
                         {/* Badge Footer */}
-                        <div className="bg-[#FAFAF9] px-2.5 py-1 rounded border-t border-[#E4E4E1] flex items-center justify-between text-[8px] text-[#6B6B66]" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          <span>Young Investors Network — PIMS</span>
-                          <span className="font-bold text-[#2F7D4F] uppercase tracking-wider" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                            {reg.checkInStatus === 'Checked In' ? 'Checked In' : 'VERIFIED'}
+                        <div className="bg-[#FAFAF9] px-3 py-1 rounded border-t border-[#E4E4E1] flex items-center justify-between text-[9px] text-[#6B6B66]" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                          <span>YIN-PIMS System</span>
+                          <span className="font-bold text-[#2F7D4F] uppercase tracking-wider text-[8px] flex items-center space-x-1" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            <span className="h-1.5 w-1.5 rounded-full bg-[#2F7D4F]" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }} />
+                            <span>{reg.checkInStatus === 'Checked In' ? 'Checked In' : 'VERIFIED'}</span>
                           </span>
                         </div>
                       </div>

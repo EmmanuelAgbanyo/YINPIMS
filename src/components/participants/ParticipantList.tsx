@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { Participant } from '../../types';
-import { Search, UserPlus, ChevronRight, Printer, Download, FileSpreadsheet, FileJson, Calendar, Pencil } from 'lucide-react';
+import { Search, UserPlus, ChevronRight, Printer, Download, FileSpreadsheet, FileJson, Calendar, Pencil, Filter } from 'lucide-react';
 import { ParticipantDetailDrawer } from './ParticipantDetailDrawer';
 import { EditParticipantModal } from './EditParticipantModal';
 import { BatchBadgePrintModal } from '../badge/BatchBadgePrintModal';
-import { exportParticipantsCSV, exportParticipantsJSON } from '../../utils/exportUtils';
+import { ParticipantExportModal } from './ParticipantExportModal';
+import { exportParticipantsCSV, exportParticipantsJSON, resolveParticipantTitle } from '../../utils/exportUtils';
+import { getBadgeTitleTheme } from '../badge/ParticipantBadgeModal';
 
 interface ParticipantListProps {
   onRegisterNew: () => void;
@@ -18,10 +20,12 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ onRegisterNew,
   const [searchQuery, setSearchQuery] = useState('');
   const [genderFilter, setGenderFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [titleFilter, setTitleFilter] = useState('all');
   const [selectedParticipant, setSelectedParticipant] = useState<Participant | null>(null);
   const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null);
   const [isBatchPrintOpen, setIsBatchPrintOpen] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   const effectiveEventId = filterEventId || selectedEventId;
   const currentEvent = effectiveEventId !== 'all' ? data.events.find(e => e.id === effectiveEventId) : null;
@@ -48,16 +52,19 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ onRegisterNew,
       (statusFilter === 'Checked In' && pRegs.some(r => r.checkInStatus === 'Checked In')) ||
       (statusFilter === 'Waitlisted' && pRegs.some(r => r.status === 'Waitlisted'));
 
-    return matchesSearch && matchesGender && matchesStatus;
+    const effectiveTitle = resolveParticipantTitle(p, pRegs[0], data.users);
+    const matchesTitle = titleFilter === 'all' || effectiveTitle.toLowerCase() === titleFilter.toLowerCase();
+
+    return matchesSearch && matchesGender && matchesStatus && matchesTitle;
   });
 
   const handleExportCSV = () => {
-    exportParticipantsCSV(data, effectiveEventId, filteredParticipants);
+    exportParticipantsCSV(data, effectiveEventId, filteredParticipants, undefined, titleFilter);
     setIsExportMenuOpen(false);
   };
 
   const handleExportJSON = () => {
-    exportParticipantsJSON(data, effectiveEventId, filteredParticipants);
+    exportParticipantsJSON(data, effectiveEventId, filteredParticipants, undefined, titleFilter);
     setIsExportMenuOpen(false);
   };
 
@@ -77,29 +84,50 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ onRegisterNew,
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           {/* Export Dropdown Menu */}
           <div className="relative">
-            <button
-              onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
-              className="flex items-center space-x-1.5 h-9 px-3.5 bg-white border border-[#E4E4E1] text-[#14595A] hover:bg-[#FAFAF9] text-xs font-semibold rounded-xl transition-colors cursor-pointer shadow-2xs"
-            >
-              <Download className="h-4 w-4 text-[#14595A]" />
-              <span>Export Participants</span>
-            </button>
+            <div className="inline-flex rounded-xl shadow-2xs">
+              <button
+                onClick={() => setIsExportModalOpen(true)}
+                className="flex items-center space-x-1.5 h-9 px-3.5 bg-white border border-[#E4E4E1] text-[#14595A] hover:bg-[#FAFAF9] text-xs font-semibold rounded-l-xl transition-colors cursor-pointer"
+                title="Open Advanced Export Dialog with Title & Attendance Filters"
+              >
+                <Download className="h-4 w-4 text-[#14595A]" />
+                <span>Export Participants</span>
+              </button>
+              <button
+                onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+                className="h-9 px-2 bg-white border-y border-r border-[#E4E4E1] text-[#14595A] hover:bg-[#FAFAF9] text-xs rounded-r-xl transition-colors cursor-pointer"
+                title="Quick Export Options"
+              >
+                ▼
+              </button>
+            </div>
 
             {isExportMenuOpen && (
-              <div className="absolute right-0 mt-2 w-56 rounded-xl bg-white border border-[#E4E4E1] shadow-xl z-20 p-1.5 space-y-1">
+              <div className="absolute right-0 mt-2 w-64 rounded-xl bg-white border border-[#E4E4E1] shadow-xl z-20 p-2 space-y-1">
+                <button
+                  onClick={() => {
+                    setIsExportModalOpen(true);
+                    setIsExportMenuOpen(false);
+                  }}
+                  className="w-full flex items-center space-x-2.5 px-3 py-2 text-xs font-bold text-[#14595A] bg-[#EBF4F4] hover:bg-[#D7E9E9] rounded-lg transition-colors cursor-pointer text-left"
+                >
+                  <Filter className="h-4 w-4 text-[#14595A]" />
+                  <span>Custom Filtered Export...</span>
+                </button>
+                <div className="border-t border-[#E4E4E1] my-1" />
                 <button
                   onClick={handleExportCSV}
                   className="w-full flex items-center space-x-2.5 px-3 py-2 text-xs font-semibold text-[#1C1C1A] hover:bg-[#FAFAF9] rounded-lg transition-colors cursor-pointer text-left"
                 >
                   <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
-                  <span>Export to CSV Excel</span>
+                  <span>Export Current Table (CSV)</span>
                 </button>
                 <button
                   onClick={handleExportJSON}
                   className="w-full flex items-center space-x-2.5 px-3 py-2 text-xs font-semibold text-[#1C1C1A] hover:bg-[#FAFAF9] rounded-lg transition-colors cursor-pointer text-left"
                 >
                   <FileJson className="h-4 w-4 text-amber-600" />
-                  <span>Export to JSON Data</span>
+                  <span>Export Current Table (JSON)</span>
                 </button>
               </div>
             )}
@@ -150,12 +178,20 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ onRegisterNew,
             <span className="text-xs font-bold text-[#1C1C1A]">Event-Specific Quick Export</span>
           </div>
 
-          <div className="flex items-center space-x-2 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={() => setIsExportModalOpen(true)}
+              className="flex items-center space-x-1.5 h-9 px-3.5 bg-[#EBF4F4] text-[#14595A] hover:bg-[#D7E9E9] text-xs font-bold rounded-xl transition-colors cursor-pointer"
+            >
+              <Filter className="h-3.5 w-3.5" />
+              <span>Filter & Export by Title...</span>
+            </button>
+
             <select
               value={effectiveEventId}
               onChange={(e) => {
                 if (e.target.value !== 'all') {
-                  exportParticipantsCSV(data, e.target.value);
+                  exportParticipantsCSV(data, e.target.value, undefined, undefined, titleFilter);
                 }
               }}
               className="h-9 px-3 text-xs rounded-xl border border-[#E4E4E1] bg-[#FAFAF9] text-[#1C1C1A] focus:outline-none cursor-pointer w-full sm:w-64"
@@ -172,7 +208,7 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ onRegisterNew,
       </div>
 
       {/* Filter & Search Controls */}
-      <div className="bg-white p-3.5 rounded-2xl border border-[#E4E4E1] shadow-2xs flex flex-col sm:flex-row items-center gap-3">
+      <div className="bg-white p-3.5 rounded-2xl border border-[#E4E4E1] shadow-2xs flex flex-col lg:flex-row items-center gap-3">
         <div className="relative flex-1 w-full">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-[#6B6B66]" />
           <input
@@ -184,7 +220,22 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ onRegisterNew,
           />
         </div>
 
-        <div className="flex items-center space-x-2 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+          {/* Designated Title Filter */}
+          <select
+            value={titleFilter}
+            onChange={e => setTitleFilter(e.target.value)}
+            className="h-9 px-3 text-xs rounded-xl border border-[#E4E4E1] bg-[#FAFAF9] text-[#1C1C1A] focus:outline-none cursor-pointer font-semibold"
+          >
+            <option value="all">All Titles / Roles</option>
+            <option value="Contestant">🏆 Contestants</option>
+            <option value="Staff">🛡️ Staff</option>
+            <option value="Volunteer">🤝 Volunteers</option>
+            <option value="Coordinator">🎯 Coordinators</option>
+            <option value="Speaker">🎤 Speakers</option>
+            <option value="Delegate">👥 Delegates</option>
+          </select>
+
           <select
             value={genderFilter}
             onChange={e => setGenderFilter(e.target.value)}
@@ -205,6 +256,16 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ onRegisterNew,
             <option value="Checked In">Checked In</option>
             <option value="Waitlisted">Waitlisted</option>
           </select>
+
+          {titleFilter !== 'all' && (
+            <button
+              onClick={() => setTitleFilter('all')}
+              className="h-9 px-2.5 text-[11px] font-bold text-[#B0413E] hover:bg-[#FDF2F2] rounded-xl transition-colors cursor-pointer"
+              title="Clear title filter"
+            >
+              Reset Title
+            </button>
+          )}
         </div>
       </div>
 
@@ -225,6 +286,8 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ onRegisterNew,
               <tbody className="divide-y divide-[#E4E4E1]">
                 {filteredParticipants.map(p => {
                   const regs = data.registrations.filter(r => r.participantId === p.id);
+                  const pTitle = resolveParticipantTitle(p, regs[0], data.users);
+                  const pTheme = getBadgeTitleTheme(pTitle as any);
 
                   return (
                     <tr
@@ -233,8 +296,13 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ onRegisterNew,
                       className="hover:bg-[#FAFAF9] transition-colors cursor-pointer"
                     >
                       <td className="py-3.5 px-4">
-                        <div className="font-bold text-[#1C1C1A] text-sm">{p.fullName}</div>
-                        <div className="text-[10px] text-[#6B6B66]">ID: <code className="tabular-nums font-mono">{p.id}</code></div>
+                        <div className="flex items-center space-x-2">
+                          <span className="font-bold text-[#1C1C1A] text-sm">{p.fullName}</span>
+                          <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-2xs ${pTheme.bg} ${pTheme.text}`}>
+                            {pTitle}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-[#6B6B66] mt-0.5">ID: <code className="tabular-nums font-mono">{p.id}</code></div>
                       </td>
 
                       <td className="py-3.5 px-4">
@@ -336,6 +404,14 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ onRegisterNew,
         isOpen={isBatchPrintOpen}
         onClose={() => setIsBatchPrintOpen(false)}
         initialEventId={effectiveEventId}
+      />
+
+      {/* Advanced Filtered Export Modal */}
+      <ParticipantExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        initialEventId={effectiveEventId}
+        initialTitleFilter={titleFilter}
       />
     </div>
   );

@@ -248,6 +248,7 @@ export const PublicRegistrationModal: React.FC<PublicRegistrationModalProps> = (
                   <option value="Speaker">Speaker</option>
                   <option value="Volunteer">Volunteer</option>
                   <option value="Staff">Staff</option>
+                  <option value="Coordinator">Coordinator</option>
                 </select>
                 <p className="text-[11px] text-[#6B6B66] mt-1">Classification printed on official event badges & ID cards.</p>
               </div>
